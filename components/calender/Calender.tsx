@@ -3,14 +3,6 @@
 import type React from "react";
 
 import {
-  Calendar,
-  Users,
-  Wrench,
-  MessageSquare,
-  BarChart3,
-  Package,
-  Grid3X3,
-  MessageCircle,
   Plus,
   X,
   Clock,
@@ -113,7 +105,7 @@ export default function Calender() {
     },
   ]);
 
-  const addJob = (jobData: any) => {
+  const addJob = (jobData: Omit<Job, 'id'>) => {
     const newJob = {
       id: Date.now(),
       ...jobData,
@@ -181,6 +173,7 @@ export default function Calender() {
 
     setScheduledJobs(scheduledJobs.filter((j) => j.id !== jobId));
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { mechanicIndex, timeSlot, ...job } = scheduledJob;
     setJobs([...jobs, job]);
   };
@@ -488,7 +481,7 @@ export default function Calender() {
                 <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                 <p className="text-sm">No unscheduled jobs</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Click "Add" to create a new job
+                  Click &quot;Add&quot; to create a new job
                 </p>
               </div>
             ) : (
@@ -723,7 +716,7 @@ function ScheduledJobBlock({
   );
 }
 
-function JobEntryForm({ onSubmit }: { onSubmit: (data: any) => void }) {
+function JobEntryForm({ onSubmit }: { onSubmit: (data: Omit<Job, 'id'>) => void }) {
   const [formData, setFormData] = useState({
     title: "",
     customer: "",
@@ -738,6 +731,7 @@ function JobEntryForm({ onSubmit }: { onSubmit: (data: any) => void }) {
     onSubmit({
       ...formData,
       duration: Number.parseFloat(formData.duration),
+      priority: formData.priority as "low" | "medium" | "high",
     });
     setFormData({
       title: "",
