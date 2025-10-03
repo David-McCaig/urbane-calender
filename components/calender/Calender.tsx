@@ -9,17 +9,9 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import {
@@ -31,16 +23,19 @@ import {
   useDraggable,
   useDroppable,
 } from "@dnd-kit/core";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Job {
-  id: number;
-  title: string;
-  customer: string;
-  duration: number;
-  type: string;
-  description: string;
-  priority?: "low" | "medium" | "high";
+  workorderID: string;
+  timeIn: string;
+  etaOut: string;
+  customerID: string;
+  hookIn: string;
+  shopID: string;
+  workorderStatusID: string;
+  saleID: string;
+  saleLineID: string;
+  duration?: number;
   mechanicIndex?: number;
   timeSlot?: number;
 }
@@ -51,10 +46,11 @@ interface ScheduledJob extends Job {
 }
 
 const mechanics = [
-  { name: "Marcus Johnson", avatar: "MJ", specialty: "Engine Specialist" },
-  { name: "Sarah Chen", avatar: "SC", specialty: "Transmission Expert" },
-  { name: "Mike Rodriguez", avatar: "MR", specialty: "Brake & Suspension" },
-  { name: "Lisa Thompson", avatar: "LT", specialty: "Electrical Systems" },
+  { name: "Em Kieffer", avatar: "EK", specialty: "Service Writer" },
+  { name: "Rory Hiles", avatar: "RH", specialty: "Service Writer" },
+  { name: "Nestor Czernysz", avatar: "NC", specialty: "Mechanic" },
+  { name: "Silum Zhang", avatar: "SZ", specialty: "Mechanic" },
+  { name: "Sasha Fabrikant", avatar: "SF", specialty: "Service Lead" },
 ];
 
 export default function Calender() {
@@ -62,52 +58,68 @@ export default function Calender() {
   const [activeJob, setActiveJob] = useState<Job | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([
     {
-      id: 1,
-      title: "Oil Change",
-      customer: "John Smith",
+      workorderID: "1",
+      timeIn: "2021-10-25T15:11:28+00:00",
+      etaOut: "2021-10-25T16:11:28+00:00",
+      customerID: "2",
+      hookIn: "Oil Change",
+      shopID: "1",
+      workorderStatusID: "5",
+      saleID: "0",
+      saleLineID: "138",
       duration: 1,
-      type: "maintenance",
-      priority: "low",
-      description: "Regular oil change and filter replacement",
     },
     {
-      id: 2,
-      title: "Brake Repair",
-      customer: "Sarah Johnson",
-      duration: 2,
-      type: "repair",
-      priority: "high",
-      description: "Replace front brake pads and rotors",
+      workorderID: "2",
+      timeIn: "2021-10-25T14:00:00+00:00",
+      etaOut: "2021-10-25T16:00:00+00:00",
+      customerID: "3",
+      hookIn: "Brake Repair",
+      shopID: "1",
+      workorderStatusID: "5",
+      saleID: "0",
+      saleLineID: "139",
+      duration: 1,
     },
     {
-      id: 3,
-      title: "Engine Diagnostic",
-      customer: "Mike Wilson",
-      duration: 1.5,
-      type: "diagnostic",
-      priority: "medium",
-      description: "Check engine light diagnosis",
+      workorderID: "3",
+      timeIn: "2021-10-25T13:30:00+00:00",
+      etaOut: "2021-10-25T15:00:00+00:00",
+      customerID: "4",
+      hookIn: "Engine Diagnostic",
+      shopID: "1",
+      workorderStatusID: "5",
+      saleID: "0",
+      saleLineID: "140",
+      duration: 1,
     },
   ]);
   const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([
     {
-      id: 100,
-      title: "Transmission Service",
-      customer: "Alice Brown",
-      duration: 3,
-      type: "maintenance",
-      priority: "medium",
-      description: "Transmission fluid change",
+      workorderID: "100",
+      timeIn: "2021-10-25T10:00:00+00:00",
+      etaOut: "2021-10-25T13:00:00+00:00",
+      customerID: "5",
+      hookIn: "Transmission Service",
+      shopID: "1",
+      workorderStatusID: "5",
+      saleID: "0",
+      saleLineID: "141",
+      duration: 1,
       mechanicIndex: 1,
       timeSlot: 1,
     },
   ]);
 
-  const addJob = (jobData: Omit<Job, 'id'>) => {
+
+  const addJob = (jobData: Omit<Job, 'workorderID'>) => {
     const newJob = {
-      id: Date.now(),
+      workorderID: Date.now().toString(),
+      duration: 1, // Default to 1 hour
       ...jobData,
     };
     setJobs([...jobs, newJob]);
@@ -115,9 +127,9 @@ export default function Calender() {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    const unscheduledJob = jobs.find((j) => j.id === Number(event.active.id));
+    const unscheduledJob = jobs.find((j) => j.workorderID === event.active.id);
     const scheduledJob = scheduledJobs.find(
-      (j) => j.id === Number(event.active.id)
+      (j) => j.workorderID === event.active.id
     );
     setActiveJob(unscheduledJob || scheduledJob || null);
   };
@@ -128,19 +140,35 @@ export default function Calender() {
 
     if (!over) return;
 
-    const jobId = Number(active.id);
-    const unscheduledJob = jobs.find((j) => j.id === jobId);
-    const scheduledJob = scheduledJobs.find((j) => j.id === jobId);
+    const jobId = active.id as string;
+    const unscheduledJob = jobs.find((j) => j.workorderID === jobId);
+    const scheduledJob = scheduledJobs.find((j) => j.workorderID === jobId);
     const job = unscheduledJob || scheduledJob;
 
     if (!job) return;
 
     const dropZoneId = over.id as string;
+    
+    // Handle dropping back to unscheduled jobs
+    if (dropZoneId === "unscheduled-jobs") {
+      if (scheduledJob) {
+        // Remove from scheduled jobs
+        setScheduledJobs(scheduledJobs.filter((j) => j.workorderID !== jobId));
+        
+        // Add back to unscheduled jobs (remove scheduling properties)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { mechanicIndex, timeSlot, ...unscheduledJobData } = scheduledJob;
+        setJobs([...jobs, unscheduledJobData]);
+      }
+      return;
+    }
+
+    // Handle dropping to schedule slots
     if (!dropZoneId.startsWith("slot-")) return;
 
     const [, mechanicIndex, timeSlot] = dropZoneId.split("-").map(Number);
 
-    const otherScheduledJobs = scheduledJobs.filter((j) => j.id !== jobId);
+    const otherScheduledJobs = scheduledJobs.filter((j) => j.workorderID !== jobId);
     const conflicts = getSchedulingConflicts(
       job,
       mechanicIndex,
@@ -154,9 +182,9 @@ export default function Calender() {
     }
 
     if (unscheduledJob) {
-      setJobs(jobs.filter((j) => j.id !== jobId));
+      setJobs(jobs.filter((j) => j.workorderID !== jobId));
     } else if (scheduledJob) {
-      setScheduledJobs(scheduledJobs.filter((j) => j.id !== jobId));
+      setScheduledJobs(scheduledJobs.filter((j) => j.workorderID !== jobId));
     }
 
     const newScheduledJob: ScheduledJob = {
@@ -167,11 +195,11 @@ export default function Calender() {
     setScheduledJobs([...otherScheduledJobs, newScheduledJob]);
   };
 
-  const removeScheduledJob = (jobId: number) => {
-    const scheduledJob = scheduledJobs.find((j) => j.id === jobId);
+  const removeScheduledJob = (jobId: string) => {
+    const scheduledJob = scheduledJobs.find((j) => j.workorderID === jobId);
     if (!scheduledJob) return;
 
-    setScheduledJobs(scheduledJobs.filter((j) => j.id !== jobId));
+    setScheduledJobs(scheduledJobs.filter((j) => j.workorderID !== jobId));
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { mechanicIndex, timeSlot, ...job } = scheduledJob;
@@ -185,7 +213,7 @@ export default function Calender() {
     existingJobs: ScheduledJob[]
   ): string[] => {
     const conflicts: string[] = [];
-    const jobEndTime = timeSlot + job.duration * 4;
+    const jobEndTime = timeSlot + (job.duration || 1) * 4;
 
     if (jobEndTime > 32) {
       conflicts.push("Job extends beyond work hours (6 PM)");
@@ -195,13 +223,13 @@ export default function Calender() {
       if (existingJob.mechanicIndex !== mechanicIndex) return false;
 
       const existingStart = existingJob.timeSlot;
-      const existingEnd = existingJob.timeSlot + existingJob.duration * 4;
+      const existingEnd = existingJob.timeSlot + (existingJob.duration || 1) * 4;
 
       return timeSlot < existingEnd && jobEndTime > existingStart;
     });
 
     if (overlappingJobs.length > 0) {
-      conflicts.push(`Time slot conflicts with ${overlappingJobs[0].title}`);
+      conflicts.push(`Time slot conflicts with ${overlappingJobs[0].hookIn}`);
     }
 
     return conflicts;
@@ -213,16 +241,13 @@ export default function Calender() {
     const mechanicJobs = scheduledJobs.filter(
       (job) => job.mechanicIndex === mechanicIndex
     );
-    const totalHours = mechanicJobs.reduce((sum, job) => sum + job.duration, 0);
+    const totalHours = mechanicJobs.reduce((sum, job) => sum + (job.duration || 1), 0);
     return { hours: totalHours, jobs: mechanicJobs.length };
   };
 
   const sortedJobs = [...jobs].sort((a, b) => {
-    const priorityOrder = { high: 3, medium: 2, low: 1 };
-    return (
-      (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) -
-      (priorityOrder[a.priority as keyof typeof priorityOrder] || 0)
-    );
+    // Sort by workorderID for consistent ordering
+    return a.workorderID.localeCompare(b.workorderID);
   });
 
   const formatDate = (date: Date) => {
@@ -253,12 +278,38 @@ export default function Calender() {
     setShowDatePicker(false);
   };
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollLeft, scrollWidth, clientWidth } = e.currentTarget;
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+  };
+
+  const scrollMechanics = (direction: 'left' | 'right') => {
+    const scrollContainer = document.querySelector('.mechanics-scroll-container') as HTMLElement;
+    if (scrollContainer) {
+      const scrollAmount = 200; // pixels to scroll
+      scrollContainer.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   return (
     <DndContext
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
+      <style jsx>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <div className="min-h-screen bg-gray-50 flex">
         {/* Main Content */}
         <div className="flex-1">
@@ -352,44 +403,69 @@ export default function Calender() {
             </div>
 
             {/* Scheduler Grid */}
-            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-              <div className="grid grid-cols-5 border-b">
-                {/* Time column header */}
-                <div className="p-4 bg-gray-50 border-r">
+            <div className="bg-white rounded-lg shadow-sm border overflow-hidden relative">
+              {/* Scroll Indicators */}
+              {canScrollLeft && (
+                <button
+                  onClick={() => scrollMechanics('left')}
+                  className="absolute left-20 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-300 rounded-full p-2 shadow-md hover:bg-gray-50 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4 text-gray-600" />
+                </button>
+              )}
+              {canScrollRight && (
+                <button
+                  onClick={() => scrollMechanics('right')}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-300 rounded-full p-2 shadow-md hover:bg-gray-50 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4 text-gray-600" />
+                </button>
+              )}
+
+              {/* Header Row */}
+              <div className="flex border-b">
+                {/* Time column header - fixed width */}
+                <div className="w-20 p-4 bg-gray-50 border-r flex-shrink-0">
                   <span className="text-sm font-medium text-gray-600">
                     TIME
                   </span>
                 </div>
 
-                {/* Mechanic columns */}
-                {mechanics.map((mechanic, index) => (
-                  <div
-                    key={index}
-                    className="p-4 bg-gray-50 border-r last:border-r-0"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src={`/mechanic-${index + 1}.jpg`} />
-                        <AvatarFallback className="bg-blue-100 text-blue-700 font-medium">
-                          {mechanic.avatar}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium text-gray-900 text-sm">
-                          {mechanic.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {mechanic.specialty}
+                {/* Mechanic columns - scrollable */}
+                <div 
+                  className="flex overflow-x-auto scrollbar-hide mechanics-scroll-container"
+                  onScroll={handleScroll}
+                >
+                  {mechanics.map((mechanic, index) => (
+                    <div
+                      key={index}
+                      className="w-48 p-4 bg-gray-50 border-r last:border-r-0 flex-shrink-0"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="w-10 h-10">
+                          {/* <AvatarImage src={`/mechanic-${index + 1}.jpg`} /> */}
+                          <AvatarFallback className="bg-blue-100 text-blue-700 font-medium">
+                            {mechanic.avatar}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium text-gray-900 text-sm">
+                            {mechanic.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {mechanic.specialty}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              <div className="grid grid-cols-5">
-                {/* Time slots column */}
-                <div className="border-r bg-gray-50/50">
+              {/* Content Row */}
+              <div className="flex">
+                {/* Time slots column - fixed width */}
+                <div className="w-20 border-r bg-gray-50/50 flex-shrink-0">
                   {Array.from({ length: 32 }, (_, index) => {
                     const totalMinutes = 10 * 60 + index * 15; // Start at 10 AM, add 15 minutes per slot
                     const hour = Math.floor(totalMinutes / 60);
@@ -422,31 +498,36 @@ export default function Calender() {
                   })}
                 </div>
 
-                {/* Mechanic schedule columns */}
-                {Array.from({ length: 4 }).map((_, mechanicIndex) => (
-                  <div
-                    key={mechanicIndex}
-                    className="border-r last:border-r-0 relative"
-                  >
-                    {Array.from({ length: 32 }, (_, timeIndex) => (
-                      <DropZone
-                        key={timeIndex}
-                        id={`slot-${mechanicIndex}-${timeIndex}`}
-                        className="h-5 border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors relative"
-                      />
-                    ))}
-
-                    {scheduledJobs
-                      .filter((job) => job.mechanicIndex === mechanicIndex)
-                      .map((job) => (
-                        <ScheduledJobBlock
-                          key={job.id}
-                          job={job}
-                          onRemove={() => removeScheduledJob(job.id)}
+                {/* Mechanic schedule columns - scrollable */}
+                <div 
+                  className="flex overflow-x-auto scrollbar-hide mechanics-scroll-container"
+                  onScroll={handleScroll}
+                >
+                  {mechanics.map((_, mechanicIndex) => (
+                    <div
+                      key={mechanicIndex}
+                      className="w-48 border-r last:border-r-0 relative flex-shrink-0"
+                    >
+                      {Array.from({ length: 32 }, (_, timeIndex) => (
+                        <DropZone
+                          key={timeIndex}
+                          id={`slot-${mechanicIndex}-${timeIndex}`}
+                          className="h-5 border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors relative"
                         />
                       ))}
-                  </div>
-                ))}
+
+                      {scheduledJobs
+                        .filter((job) => job.mechanicIndex === mechanicIndex)
+                        .map((job) => (
+                          <ScheduledJobBlock
+                            key={job.workorderID}
+                            job={job}
+                            onRemove={() => removeScheduledJob(job.workorderID)}
+                          />
+                        ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </main>
@@ -476,21 +557,29 @@ export default function Calender() {
               <Badge variant="outline">{jobs.length}</Badge>
             </div>
 
-            {jobs.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm">No unscheduled jobs</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Click &quot;Add&quot; to create a new job
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {sortedJobs.map((job) => (
-                  <DraggableJob key={job.id} job={job} />
-                ))}
-              </div>
-            )}
+            <DropZone
+              id="unscheduled-jobs"
+              className="min-h-[200px] border-2 border-dashed border-gray-300 rounded-lg p-4 transition-colors"
+            >
+              {jobs.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">No unscheduled jobs</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Click &quot;Add&quot; to create a new job
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Or drag scheduled jobs here to unschedule them
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {sortedJobs.map((job) => (
+                    <DraggableJob key={job.workorderID} job={job} />
+                  ))}
+                </div>
+              )}
+            </DropZone>
           </div>
         </div>
 
@@ -523,10 +612,10 @@ export default function Calender() {
           {activeJob ? (
             <div className="p-3 bg-blue-100 border-2 border-blue-300 rounded-lg shadow-lg">
               <div className="font-medium text-sm text-blue-900">
-                {activeJob.title}
+                {activeJob.hookIn}
               </div>
               <div className="text-xs text-blue-700">
-                {activeJob.customer} • {activeJob.duration}h
+                Customer {activeJob.customerID} • {activeJob.duration || 1}h
               </div>
             </div>
           ) : null}
@@ -561,7 +650,7 @@ export default function Calender() {
 function DraggableJob({ job }: { job: Job }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
-      id: job.id,
+      id: job.workorderID,
     });
 
   const style = transform
@@ -570,17 +659,8 @@ function DraggableJob({ job }: { job: Job }) {
       }
     : undefined;
 
-  const getPriorityColor = (priority?: string) => {
-    switch (priority) {
-      case "high":
-        return "border-l-red-400 bg-red-50";
-      case "medium":
-        return "border-l-yellow-400 bg-yellow-50";
-      case "low":
-        return "border-l-green-400 bg-green-50";
-      default:
-        return "border-l-gray-400 bg-gray-50";
-    }
+  const getJobColor = () => {
+    return "border-l-blue-400 bg-blue-50";
   };
 
   return (
@@ -589,31 +669,18 @@ function DraggableJob({ job }: { job: Job }) {
       style={style}
       {...listeners}
       {...attributes}
-      className={`p-3 rounded-lg border border-l-4 cursor-move hover:shadow-md transition-all ${getPriorityColor(
-        job.priority
-      )} ${isDragging ? "opacity-50" : ""}`}
+      className={`p-3 rounded-lg border border-l-4 cursor-move hover:shadow-md transition-all ${getJobColor()} ${isDragging ? "opacity-50" : ""}`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="font-medium text-sm text-gray-900">{job.title}</div>
+          <div className="font-medium text-sm text-gray-900">{job.hookIn}</div>
           <div className="text-xs text-gray-500">
-            {job.customer} • {job.duration}h
+            Customer {job.customerID} • {job.duration || 1}h
           </div>
         </div>
-        {job.priority && (
-          <Badge
-            variant={
-              job.priority === "high"
-                ? "destructive"
-                : job.priority === "medium"
-                ? "default"
-                : "secondary"
-            }
-            className="text-xs"
-          >
-            {job.priority}
-          </Badge>
-        )}
+        <Badge variant="secondary" className="text-xs">
+          WO-{job.workorderID}
+        </Badge>
       </div>
     </div>
   );
@@ -632,17 +699,20 @@ function DropZone({
     id,
   });
 
+  const isUnscheduledDropZone = id === "unscheduled-jobs";
+
   return (
     <div
       ref={setNodeRef}
-      className={`${className} ${isOver ? "bg-blue-50 border-blue-200" : ""}`}
+      className={`${className} ${
+        isOver 
+          ? isUnscheduledDropZone 
+            ? "bg-green-50 border-green-400 border-solid" 
+            : "bg-blue-50 border-blue-200"
+          : ""
+      }`}
     >
       {children}
-      {isOver && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xs text-blue-600 font-medium">Drop here</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -656,7 +726,7 @@ function ScheduledJobBlock({
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
-      id: job.id,
+      id: job.workorderID,
     });
 
   const style = transform
@@ -665,22 +735,12 @@ function ScheduledJobBlock({
       }
     : undefined;
 
-  const getJobColor = (type: string) => {
-    const colors = {
-      maintenance: "bg-green-100 border-green-300 text-green-800",
-      repair: "bg-red-100 border-red-300 text-red-800",
-      inspection: "bg-blue-100 border-blue-300 text-blue-800",
-      diagnostic: "bg-yellow-100 border-yellow-300 text-yellow-800",
-      bodywork: "bg-purple-100 border-purple-300 text-purple-800",
-    };
-    return (
-      colors[type as keyof typeof colors] ||
-      "bg-gray-100 border-gray-300 text-gray-800"
-    );
+  const getJobColor = () => {
+    return "bg-blue-100 border-blue-300 text-blue-800";
   };
 
   const topPosition = job.timeSlot * 20; // 20px per time slot (h-5 = 20px)
-  const height = job.duration * 4 * 20; // duration * 4 slots per hour * 20px per slot
+  const height = (job.duration || 1) * 4 * 20; // duration * 4 slots per hour * 20px per slot
 
   return (
     <div
@@ -692,164 +752,119 @@ function ScheduledJobBlock({
       }}
       {...listeners}
       {...attributes}
-      className={`absolute left-1 right-1 rounded-md border-2 p-2 cursor-move hover:shadow-md transition-shadow ${getJobColor(
-        job.type
-      )} ${isDragging ? "opacity-50 z-50" : ""}`}
+      className={`absolute left-1 right-1 rounded-md border-2 p-2 cursor-move hover:shadow-md transition-shadow ${getJobColor()} ${isDragging ? "opacity-50 z-50" : ""}`}
       onContextMenu={(e) => {
         e.preventDefault();
         onRemove();
       }}
     >
-      <div className="text-xs font-medium truncate">{job.title}</div>
-      <div className="text-xs opacity-75 truncate">{job.customer}</div>
-      <div className="text-xs opacity-75">{job.duration}h</div>
-      {job.priority && (
-        <Badge
-          variant={job.priority === "high" ? "destructive" : "secondary"}
-          className="text-xs mt-1"
-        >
-          {job.priority}
-        </Badge>
-      )}
+      <div className="text-xs font-medium truncate">{job.hookIn}</div>
+      <div className="text-xs opacity-75 truncate">Customer {job.customerID}</div>
+      <div className="text-xs opacity-75">{job.duration || 1}h</div>
+      <Badge variant="secondary" className="text-xs mt-1">
+        WO-{job.workorderID}
+      </Badge>
       <div className="absolute top-1 right-1 text-xs opacity-50">⋮⋮</div>
     </div>
   );
 }
 
-function JobEntryForm({ onSubmit }: { onSubmit: (data: Omit<Job, 'id'>) => void }) {
+function JobEntryForm({ onSubmit }: { onSubmit: (data: Omit<Job, 'workorderID'>) => void }) {
   const [formData, setFormData] = useState({
-    title: "",
-    customer: "",
-    duration: "1",
-    type: "",
-    priority: "medium",
-    description: "",
+    timeIn: new Date().toISOString(),
+    etaOut: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour from now
+    customerID: "",
+    hookIn: "",
+    shopID: "1",
+    workorderStatusID: "5",
+    saleID: "0",
+    saleLineID: "",
+    duration: 1,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      ...formData,
-      duration: Number.parseFloat(formData.duration),
-      priority: formData.priority as "low" | "medium" | "high",
-    });
+    onSubmit(formData);
     setFormData({
-      title: "",
-      customer: "",
-      duration: "1",
-      type: "",
-      priority: "medium",
-      description: "",
+      timeIn: new Date().toISOString(),
+      etaOut: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      customerID: "",
+      hookIn: "",
+      shopID: "1",
+      workorderStatusID: "5",
+      saleID: "0",
+      saleLineID: "",
+      duration: 1,
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="title">Job Title</Label>
+        <Label htmlFor="hookIn">Job Description</Label>
         <Input
-          id="title"
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          id="hookIn"
+          value={formData.hookIn}
+          onChange={(e) => setFormData({ ...formData, hookIn: e.target.value })}
           placeholder="e.g., Oil Change, Brake Repair"
           required
         />
       </div>
 
       <div>
-        <Label htmlFor="customer">Customer Name</Label>
+        <Label htmlFor="customerID">Customer ID</Label>
         <Input
-          id="customer"
-          value={formData.customer}
+          id="customerID"
+          value={formData.customerID}
           onChange={(e) =>
-            setFormData({ ...formData, customer: e.target.value })
+            setFormData({ ...formData, customerID: e.target.value })
           }
-          placeholder="Customer name"
+          placeholder="Customer ID"
           required
         />
       </div>
 
       <div>
-        <Label htmlFor="type">Job Type</Label>
-        <Select
-          value={formData.type}
-          onValueChange={(value) => setFormData({ ...formData, type: value })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select job type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="maintenance">Maintenance</SelectItem>
-            <SelectItem value="repair">Repair</SelectItem>
-            <SelectItem value="inspection">Inspection</SelectItem>
-            <SelectItem value="diagnostic">Diagnostic</SelectItem>
-            <SelectItem value="bodywork">Body Work</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        <Label htmlFor="priority">Priority</Label>
-        <Select
-          value={formData.priority}
-          onValueChange={(value) =>
-            setFormData({ ...formData, priority: value })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="low">Low</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        <Label htmlFor="duration">Duration (hours)</Label>
-        <Select
-          value={formData.duration}
-          onValueChange={(value) =>
-            setFormData({ ...formData, duration: value })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0.25">15 minutes</SelectItem>
-            <SelectItem value="0.5">30 minutes</SelectItem>
-            <SelectItem value="0.75">45 minutes</SelectItem>
-            <SelectItem value="1">1 hour</SelectItem>
-            <SelectItem value="1.25">1 hour 15 minutes</SelectItem>
-            <SelectItem value="1.5">1 hour 30 minutes</SelectItem>
-            <SelectItem value="1.75">1 hour 45 minutes</SelectItem>
-            <SelectItem value="2">2 hours</SelectItem>
-            <SelectItem value="3">3 hours</SelectItem>
-            <SelectItem value="4">4 hours</SelectItem>
-            <SelectItem value="6">6 hours</SelectItem>
-            <SelectItem value="8">Full day</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          value={formData.description}
+        <Label htmlFor="saleLineID">Sale Line ID</Label>
+        <Input
+          id="saleLineID"
+          value={formData.saleLineID}
           onChange={(e) =>
-            setFormData({ ...formData, description: e.target.value })
+            setFormData({ ...formData, saleLineID: e.target.value })
           }
-          placeholder="Job details and notes"
-          rows={3}
+          placeholder="Sale Line ID"
+          required
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="timeIn">Time In</Label>
+        <Input
+          id="timeIn"
+          type="datetime-local"
+          value={formData.timeIn.slice(0, 16)}
+          onChange={(e) =>
+            setFormData({ ...formData, timeIn: new Date(e.target.value).toISOString() })
+          }
+          required
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="etaOut">ETA Out</Label>
+        <Input
+          id="etaOut"
+          type="datetime-local"
+          value={formData.etaOut.slice(0, 16)}
+          onChange={(e) =>
+            setFormData({ ...formData, etaOut: new Date(e.target.value).toISOString() })
+          }
+          required
         />
       </div>
 
       <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-        Add Job
+        Add Work Order
       </Button>
     </form>
   );

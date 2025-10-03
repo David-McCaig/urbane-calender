@@ -12,7 +12,7 @@ export default async function ProtectedPage() {
   }
 
   return (
-    <div className="">
+    <div className="w-full">
      <Calender/>
     </div>
   );
