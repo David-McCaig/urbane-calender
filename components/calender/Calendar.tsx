@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Plus,
   X,
@@ -43,6 +43,7 @@ import {
   type Mechanic,
   type ScheduledJob,
 } from "@/lib/database/calendar";
+import { useActiveShop } from "@/lib/context/shop-context";
 
 export default function Calendar() {
   const [showJobForm, setShowJobForm] = useState(false);
@@ -51,15 +52,25 @@ export default function Calendar() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-  
+
   // State for data from Supabase
   const [jobs, setJobs] = useState<Job[]>([]);
   const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
   const [mechanics, setMechanics] = useState<Mechanic[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Get active shop from context
+  const { activeShop } = useActiveShop();
+
+  // Keep a ref to currentDate so the realtime callbacks always read the latest date
+  // without needing to resubscribe when the date changes.
+  const currentDateRef = useRef(currentDate);
+  currentDateRef.current = currentDate;
+
   // Load initial data
   useEffect(() => {
+    if (!activeShop) return;
+
     const loadData = async () => {
       try {
         setLoading(true);
@@ -68,7 +79,7 @@ export default function Calendar() {
           getMechanics(),
           getScheduledJobs(currentDate.toISOString().split('T')[0])
         ]);
-        
+
         setJobs(jobsData);
         setMechanics(mechanicsData);
         setScheduledJobs(scheduledJobsData);
@@ -80,27 +91,26 @@ export default function Calendar() {
     };
 
     loadData();
-  }, [currentDate]);
+  }, [currentDate, activeShop]);
 
-  // Set up real-time subscriptions
+  // Set up real-time subscriptions — scoped to the active shop
   useEffect(() => {
-    const jobsSubscription = subscribeToJobs((payload) => {
+    if (!activeShop) return;
+
+    const jobsSubscription = subscribeToJobs(activeShop.id, (payload) => {
       console.log('Jobs changed:', payload);
-      // Reload jobs when changes occur
       getJobs().then(setJobs).catch(console.error);
     });
 
-    const scheduledJobsSubscription = subscribeToScheduledJobs((payload) => {
+    const scheduledJobsSubscription = subscribeToScheduledJobs(activeShop.id, (payload) => {
       console.log('Scheduled jobs changed:', payload);
-      // Reload scheduled jobs when changes occur
-      getScheduledJobs(currentDate.toISOString().split('T')[0])
+      getScheduledJobs(currentDateRef.current.toISOString().split('T')[0])
         .then(setScheduledJobs)
         .catch(console.error);
     });
 
-    const mechanicsSubscription = subscribeToMechanics((payload) => {
+    const mechanicsSubscription = subscribeToMechanics(activeShop.id, (payload) => {
       console.log('Mechanics changed:', payload);
-      // Reload mechanics when changes occur
       getMechanics().then(setMechanics).catch(console.error);
     });
 
@@ -109,16 +119,20 @@ export default function Calendar() {
       scheduledJobsSubscription.unsubscribe();
       mechanicsSubscription.unsubscribe();
     };
-  }, [currentDate]);
+  }, [activeShop]);
 
   const addJob = async (jobData: Omit<Job, 'id' | 'shop_id' | 'created_at' | 'updated_at'>) => {
+    if (!activeShop) {
+      alert('No shop selected. Please set up your shop first.');
+      return;
+    }
+
     try {
-      // For now, we'll use a default shop_id. In a real app, this would come from user context
       const jobWithShop = {
         ...jobData,
-        shop_id: '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', // Your shop ID
+        shop_id: activeShop.id,
       };
-      
+
       const newJob = await createJob(jobWithShop);
       setJobs(prev => [newJob, ...prev]);
       setShowJobForm(false);

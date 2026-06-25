@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import Calender from "@/components/calender/Calender";
+import Calendar from "@/components/calender/Calendar";
 
 export default async function ProtectedPage() {
   const supabase = await createClient();
@@ -13,7 +13,7 @@ export default async function ProtectedPage() {
 
   return (
     <div className="w-full">
-     <Calender/>
+      <Calendar />
     </div>
   );
 }

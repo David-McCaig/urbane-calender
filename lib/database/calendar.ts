@@ -228,24 +228,39 @@ export async function getWorkOrderStatuses(): Promise<WorkOrderStatus[]> {
 }
 
 // Real-time subscriptions
-export function subscribeToJobs(callback: (payload: any) => void) {
+export function subscribeToJobs(shopId: string, callback: (payload: any) => void) {
   return supabase
-    .channel('jobs_changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, callback)
+    .channel(`jobs_changes_${shopId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'jobs',
+      filter: `shop_id=eq.${shopId}`,
+    }, callback)
     .subscribe();
 }
 
-export function subscribeToScheduledJobs(callback: (payload: any) => void) {
+export function subscribeToScheduledJobs(shopId: string, callback: (payload: any) => void) {
   return supabase
-    .channel('scheduled_jobs_changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_jobs' }, callback)
+    .channel(`scheduled_jobs_changes_${shopId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'scheduled_jobs',
+      filter: `shop_id=eq.${shopId}`,
+    }, callback)
     .subscribe();
 }
 
-export function subscribeToMechanics(callback: (payload: any) => void) {
+export function subscribeToMechanics(shopId: string, callback: (payload: any) => void) {
   return supabase
-    .channel('mechanics_changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'mechanics' }, callback)
+    .channel(`mechanics_changes_${shopId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'mechanics',
+      filter: `shop_id=eq.${shopId}`,
+    }, callback)
     .subscribe();
 }
 
