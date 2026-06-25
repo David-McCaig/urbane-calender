@@ -13,7 +13,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Insert sample shop
 INSERT INTO shops (id, name, address, phone, email) VALUES
-  ('43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Urbane Auto Repair', '123 Main Street, City, State 12345', '(555) 123-4567', 'contact@urbaneautorepair.com')
+  ('43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Urbane Cyclist', '123 Main Street, City, State 12345', '(555) 123-4567', 'contact@urbanecyclist.com')
 ON CONFLICT (id) DO NOTHING;
 
 -- Insert sample mechanics

@@ -201,7 +201,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Insert sample shop
 INSERT INTO shops (id, name, address, phone, email) VALUES
-  ('43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Urbane Auto Repair', '123 Main Street, City, State 12345', '(555) 123-4567', 'contact@urbaneautorepair.com')
+  ('43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Urbane Cyclist', '123 Main Street, City, State 12345', '(555) 123-4567', 'contact@urbanecyclist.com')
 ON CONFLICT (id) DO NOTHING;
 
 -- Insert sample mechanics
@@ -529,3 +529,17 @@ SET session_replication_role = DEFAULT;
 ALTER TABLE jobs REPLICA IDENTITY FULL;
 ALTER TABLE scheduled_jobs REPLICA IDENTITY FULL;
 ALTER TABLE mechanics REPLICA IDENTITY FULL;
+-- Seed user_shop_memberships for development
+-- Adds known developer account(s) to the seed shop
+
+INSERT INTO user_shop_memberships (user_id, shop_id, role)
+VALUES (
+  'faf50c1c-3ba1-40c6-b798-08a3c99c72f6',
+  '43f783d1-15b4-4ec5-ada0-3f25ac8e5445',
+  'manager'
+)
+ON CONFLICT (user_id, shop_id) DO NOTHING;
+-- Update seed shop name to Urbane Cyclist
+UPDATE shops
+SET name = 'Urbane Cyclist', email = 'contact@urbanecyclist.com'
+WHERE id = '43f783d1-15b4-4ec5-ada0-3f25ac8e5445';
