@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createShopAndMembership } from '@/lib/actions/membership';
 import { acceptInvitation } from '@/lib/actions/membership';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Store, Link2 } from 'lucide-react';
+import { Store, Link2, LogOut } from 'lucide-react';
 
 interface OnboardingClientProps {
   userEmail?: string;
@@ -74,6 +75,12 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
     }
   };
 
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/auth/login');
+  };
+
   if (mode === 'choose') {
     return (
       <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
@@ -113,6 +120,16 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
                     Accept an invitation from a shop owner
                   </div>
                 </div>
+              </Button>
+            </div>
+            <div className="mt-4 pt-4 border-t">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2 text-gray-500"
+                onClick={handleSignOut}
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
               </Button>
             </div>
           </CardContent>

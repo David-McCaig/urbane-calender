@@ -15,17 +15,16 @@ export default async function OnboardingPage() {
   // Check if user already has a shop membership
   const { data: memberships } = await supabase
     .from('user_shop_memberships')
-    .select('id')
+    .select('id, shop_id')
     .eq('user_id', user.id);
 
   if (memberships && memberships.length > 0) {
-    // User already belongs to at least one shop — ensure active_shop_id is set
-    if (!user.user_metadata?.active_shop_id) {
-      // Set it to the first membership
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: { active_shop_id: memberships[0].id },
+    // User already belongs to at least one shop — ensure active_shop_id is set correctly
+    const correctShopId = memberships[0].shop_id;
+    if (user.user_metadata?.active_shop_id !== correctShopId) {
+      await supabase.auth.updateUser({
+        data: { active_shop_id: correctShopId },
       });
-      // Redirect regardless — the membership is already there
     }
     redirect('/protected');
   }

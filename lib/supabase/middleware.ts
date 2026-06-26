@@ -59,17 +59,15 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // If user is authenticated but has no active shop, redirect to onboarding
-  // when trying to access protected pages
-  if (
-    user &&
-    !user.user_metadata?.active_shop_id &&
-    request.nextUrl.pathname.startsWith("/protected")
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/onboarding";
-    return NextResponse.redirect(url);
-  }
+  // TEMPORARY BYPASS: Skip onboarding redirect — let RLS handle auth
+  // TODO: Restore onboarding check once member-based routing is fixed
+  // if (
+  //   user &&
+  //   !user.user_metadata?.active_shop_id &&
+  //   request.nextUrl.pathname.startsWith("/protected")
+  // ) {
+  //   ...
+  // }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:

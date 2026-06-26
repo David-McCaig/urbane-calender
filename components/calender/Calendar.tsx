@@ -143,8 +143,9 @@ export default function Calendar() {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    const unscheduledJob = jobs.find((j) => j.id === event.active.id);
-    const scheduledJob = scheduledJobs.find((j) => j.id === event.active.id);
+    const dragId = event.active.id as string;
+    const unscheduledJob = jobs.find((j) => j.id === dragId);
+    const scheduledJob = scheduledJobs.find((j) => j.id === dragId);
     setActiveJob(unscheduledJob || scheduledJob?.job || null);
   };
 
@@ -162,15 +163,22 @@ export default function Calendar() {
     if (!job) return;
 
     const dropZoneId = over.id as string;
-    
+    const dateString = currentDate.toISOString().split('T')[0];
+
     // Handle dropping back to unscheduled jobs
     if (dropZoneId === "unscheduled-jobs") {
       if (scheduledJob) {
+        // Capture previous state for rollback
+        const previousScheduledJobs = scheduledJobs;
+        // Optimistically remove from the grid — synchronous, paints immediately
+        setScheduledJobs((prev) => prev.filter((sj) => sj.id !== scheduledJob.id));
         try {
           await deleteScheduledJob(scheduledJob.id);
-          // The real-time subscription will update the UI
+          // The real-time subscription will reconcile
         } catch (error) {
           console.error('Error unscheduling job:', error);
+          // Roll back to previous state
+          setScheduledJobs(previousScheduledJobs);
           alert('Failed to unschedule job. Please try again.');
         }
       }
@@ -187,6 +195,7 @@ export default function Calendar() {
       return;
     }
 
+    // Conflict check against current committed state, excluding the job being moved
     const otherScheduledJobs = scheduledJobs.filter((j) => j.id !== jobId);
     const conflicts = getSchedulingConflicts(
       job,
@@ -200,36 +209,70 @@ export default function Calendar() {
       return;
     }
 
+    // Capture previous state for rollback
+    const previousScheduledJobs = scheduledJobs;
+
     try {
-      // If it was an unscheduled job, schedule it
       if (unscheduledJob) {
+        // ---- Schedule an unscheduled job ----
+        // Optimistically add to the grid immediately with a placeholder ID
+        const optimisticEntry: ScheduledJob = {
+          id: `optimistic-${job.id}`,
+          job_id: job.id,
+          shop_id: job.shop_id,
+          mechanic_id: mechanics[mechanicIndex].id,
+          time_slot: timeSlot,
+          date: dateString,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          job: job,
+          mechanic: mechanics[mechanicIndex],
+        };
+        setScheduledJobs((prev) => [...prev, optimisticEntry]);
         await createScheduledJob({
           job_id: job.id,
           shop_id: job.shop_id,
           mechanic_id: mechanics[mechanicIndex].id,
           time_slot: timeSlot,
-          date: currentDate.toISOString().split('T')[0],
+          date: dateString,
         });
+        // The real-time subscription will reconcile (replaces placeholder ID with real one)
       } else if (scheduledJob) {
-        // If it was already scheduled, update the schedule
+        // ---- Move an existing scheduled job ----
+        // Optimistically update in place — synchronous, paints immediately
+        setScheduledJobs((prev) =>
+          prev.map((sj) =>
+            sj.id === scheduledJob.id
+              ? { ...sj, mechanic_id: mechanics[mechanicIndex].id, time_slot: timeSlot }
+              : sj
+          )
+        );
         await updateScheduledJob(scheduledJob.id, {
           mechanic_id: mechanics[mechanicIndex].id,
           time_slot: timeSlot,
         });
+        // The real-time subscription will reconcile
       }
-      // The real-time subscription will update the UI
     } catch (error) {
       console.error('Error scheduling job:', error);
+      // Roll back to previous state
+      setScheduledJobs(previousScheduledJobs);
       alert('Failed to schedule job. Please try again.');
     }
   };
 
   const removeScheduledJob = async (scheduledJobId: string) => {
+    // Capture previous state for rollback
+    const previousScheduledJobs = scheduledJobs;
+    // Optimistically remove from the grid — synchronous, paints immediately
+    setScheduledJobs((prev) => prev.filter((sj) => sj.id !== scheduledJobId));
     try {
       await deleteScheduledJob(scheduledJobId);
-      // The real-time subscription will update the UI
+      // The real-time subscription will reconcile
     } catch (error) {
       console.error('Error removing scheduled job:', error);
+      // Roll back to previous state
+      setScheduledJobs(previousScheduledJobs);
       alert('Failed to remove scheduled job. Please try again.');
     }
   };
