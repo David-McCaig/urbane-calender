@@ -23,6 +23,7 @@ export interface Mechanic {
   avatar: string;
   specialty: string;
   is_active: boolean;
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }

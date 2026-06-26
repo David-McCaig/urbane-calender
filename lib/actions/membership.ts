@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { revalidatePath } from 'next/cache';
 import { randomBytes } from 'crypto';
 import type { MembershipRole, UserShopMembership, Invitation, Shop } from '@/lib/types/membership';
@@ -36,10 +37,11 @@ export async function getCurrentShopId(): Promise<string | null> {
  * Called after sign-up when the user provides a shop name.
  */
 export async function createShopAndMembership(shopName: string): Promise<Shop> {
-  const { supabase, user } = await getCurrentUser();
+  const { user } = await getCurrentUser();
+  const serviceClient = createServiceClient();
 
-  // Create the shop
-  const { data: shop, error: shopError } = await supabase
+  // Create the shop (service client bypasses RLS)
+  const { data: shop, error: shopError } = await serviceClient
     .from('shops')
     .insert({ name: shopName })
     .select()
@@ -49,8 +51,8 @@ export async function createShopAndMembership(shopName: string): Promise<Shop> {
     throw new Error(`Failed to create shop: ${shopError.message}`);
   }
 
-  // Create owner membership
-  const { error: memberError } = await supabase
+  // Create owner membership (service client bypasses RLS)
+  const { error: memberError } = await serviceClient
     .from('user_shop_memberships')
     .insert({
       user_id: user.id,
@@ -60,11 +62,29 @@ export async function createShopAndMembership(shopName: string): Promise<Shop> {
 
   if (memberError) {
     // Attempt cleanup: delete the shop we just created
-    await supabase.from('shops').delete().eq('id', shop.id);
+    await serviceClient.from('shops').delete().eq('id', shop.id);
     throw new Error(`Failed to create membership: ${memberError.message}`);
   }
 
-  // Set active shop in user_metadata so RLS picks it up
+  // Auto-create a mechanic record for the new shop owner
+  try {
+    const mechanicName = user.user_metadata?.display_name
+      || (user.email ? user.email.split('@')[0] : 'Shop Owner');
+    await serviceClient.from('mechanics').insert({
+      shop_id: shop.id,
+      name: mechanicName,
+      avatar: mechanicName.charAt(0).toUpperCase(),
+      specialty: 'Shop Owner',
+      is_active: true,
+      user_id: user.id,
+    });
+  } catch (mechErr) {
+    // Non-fatal — shop and membership already exist
+    console.error('Failed to auto-create mechanic record:', mechErr);
+  }
+
+  // Set active shop in user_metadata so RLS picks it up on subsequent requests
+  const supabase = await createClient();
   const { error: updateError } = await supabase.auth.updateUser({
     data: { active_shop_id: shop.id },
   });
@@ -282,10 +302,11 @@ export async function createInvitation(
  * and their email must match the invitation.
  */
 export async function acceptInvitation(token: string): Promise<void> {
-  const { supabase, user } = await getCurrentUser();
+  const { user } = await getCurrentUser();
+  const serviceClient = createServiceClient();
 
-  // Find the invitation
-  const { data: invitation, error: invError } = await supabase
+  // Find the invitation (service client bypasses RLS, which blocks non-members)
+  const { data: invitation, error: invError } = await serviceClient
     .from('invitations')
     .select('*')
     .eq('token', token)
@@ -304,8 +325,8 @@ export async function acceptInvitation(token: string): Promise<void> {
     );
   }
 
-  // Create the membership
-  const { error: memberError } = await supabase
+  // Create the membership (service client bypasses RLS)
+  const { error: memberError } = await serviceClient
     .from('user_shop_memberships')
     .insert({
       user_id: user.id,
@@ -320,13 +341,43 @@ export async function acceptInvitation(token: string): Promise<void> {
     }
   }
 
-  // Mark invitation as accepted
-  await supabase
+  // Auto-create a mechanic record if one doesn't already exist
+  try {
+    const { data: existing } = await serviceClient
+      .from('mechanics')
+      .select('id')
+      .eq('shop_id', invitation.shop_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!existing) {
+      const mechanicName = user.user_metadata?.display_name
+        || (user.email ? user.email.split('@')[0] : 'Shop Member');
+      const specialty =
+        invitation.role === 'mechanic' ? 'Service Writer' :
+        invitation.role === 'manager' ? 'Shop Manager' : 'Shop Owner';
+      await serviceClient.from('mechanics').insert({
+        shop_id: invitation.shop_id,
+        name: mechanicName,
+        avatar: mechanicName.charAt(0).toUpperCase(),
+        specialty,
+        is_active: true,
+        user_id: user.id,
+      });
+    }
+  } catch (mechErr) {
+    // Non-fatal — membership already exists
+    console.error('Failed to auto-create mechanic record:', mechErr);
+  }
+
+  // Mark invitation as accepted (no UPDATE policy exists on invitations)
+  await serviceClient
     .from('invitations')
     .update({ accepted_at: new Date().toISOString() })
     .eq('id', invitation.id);
 
   // Set this as the active shop
+  const supabase = await createClient();
   const { error: updateError } = await supabase.auth.updateUser({
     data: { active_shop_id: invitation.shop_id },
   });
