@@ -36,7 +36,6 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
     try {
       await createShopAndMembership(shopName.trim());
       router.push('/protected');
-      router.refresh();
     } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : 'Failed to create shop'
@@ -66,7 +65,6 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
 
       await acceptInvitation(token);
       router.push('/protected');
-      router.refresh();
     } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : 'Failed to accept invitation'

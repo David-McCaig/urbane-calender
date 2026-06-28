@@ -59,7 +59,7 @@ export default function Calendar() {
   const [loading, setLoading] = useState(true);
 
   // Get active shop from context
-  const { activeShop } = useActiveShop();
+  const { activeShop, isLoading: shopLoading } = useActiveShop();
 
   // Keep a ref to currentDate so the realtime callbacks always read the latest date
   // without needing to resubscribe when the date changes.
@@ -325,12 +325,32 @@ export default function Calendar() {
     }
   };
 
-  if (loading) {
+  if (shopLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading calendar...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!activeShop) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Shop Set Up</h2>
+          <p className="text-gray-600 mb-4">
+            You need to create or join a shop before you can use the calendar.
+          </p>
+          <a
+            href="/onboarding"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Set Up Your Shop
+          </a>
         </div>
       </div>
     );
