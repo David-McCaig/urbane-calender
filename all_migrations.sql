@@ -472,20 +472,14 @@ CREATE POLICY "Users can delete jobs from their shop" ON jobs
     AND get_user_shop_role() IN ('owner', 'manager')
   );
 
--- Scheduled jobs: same role restrictions as jobs
+-- Scheduled jobs: allow all shop members to move and unschedule
 DROP POLICY IF EXISTS "Users can update scheduled jobs from their shop" ON scheduled_jobs;
 CREATE POLICY "Users can update scheduled jobs from their shop" ON scheduled_jobs
-  FOR UPDATE USING (
-    shop_id = get_user_shop_id()
-    AND get_user_shop_role() IN ('owner', 'manager')
-  );
+  FOR UPDATE USING (shop_id = get_user_shop_id());
 
 DROP POLICY IF EXISTS "Users can delete scheduled jobs from their shop" ON scheduled_jobs;
 CREATE POLICY "Users can delete scheduled jobs from their shop" ON scheduled_jobs
-  FOR DELETE USING (
-    shop_id = get_user_shop_id()
-    AND get_user_shop_role() IN ('owner', 'manager')
-  );
+  FOR DELETE USING (shop_id = get_user_shop_id());
 
 -- 10. Grant permissions on new tables and type
 GRANT USAGE ON TYPE membership_role TO authenticated;
