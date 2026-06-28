@@ -50,6 +50,7 @@ interface MembersClientProps {
   shopId: string;
 }
 
+// shopId is available to child components via props if needed
 const ROLE_LABELS: Record<MembershipRole, string> = {
   owner: 'Owner',
   manager: 'Manager',
@@ -72,7 +73,6 @@ export function MembersClient({
   invitations,
   currentUserId,
   currentRole,
-  shopId,
 }: MembersClientProps) {
   const router = useRouter();
   const canManage = currentRole === 'owner' || currentRole === 'manager';

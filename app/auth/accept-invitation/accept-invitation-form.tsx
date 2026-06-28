@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { acceptInvitation } from '@/lib/actions/membership';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { XCircle } from 'lucide-react';
 
 interface AcceptInvitationFormProps {
   token: string;

@@ -28,7 +28,6 @@ import {
 import {
   getJobs,
   createJob,
-  deleteJob,
   getMechanics,
   getScheduledJobs,
   createScheduledJob,
@@ -421,7 +420,7 @@ export default function Calendar() {
 
             {/* Mechanics Summary */}
             <div className="mb-4 grid grid-cols-4 gap-4">
-              {mechanics.map((mechanic, index) => {
+              {mechanics.map((mechanic) => {
                 const workload = getMechanicWorkload(mechanic.id, scheduledJobs);
                 return (
                   <div key={mechanic.id} className="bg-white p-3 rounded-lg border">
@@ -476,7 +475,7 @@ export default function Calendar() {
                   className="flex overflow-x-auto scrollbar-hide mechanics-scroll-container"
                   onScroll={handleScroll}
                 >
-                  {mechanics.map((mechanic, index) => (
+                  {mechanics.map((mechanic) => (
                     <div
                       key={mechanic.id}
                       className="w-48 p-4 bg-gray-50 border-r last:border-r-0 flex-shrink-0"
@@ -601,7 +600,7 @@ export default function Calendar() {
                   <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                   <p className="text-sm">No unscheduled jobs</p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Click "Add" to create a new job
+                    Click &quot;Add&quot; to create a new job
                   </p>
                   <p className="text-xs text-gray-400 mt-2">
                     Or drag scheduled jobs here to unschedule them
