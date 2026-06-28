@@ -5,11 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   Plus,
   X,
-  Clock,
   AlertCircle,
   Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -37,7 +34,6 @@ import {
   subscribeToScheduledJobs,
   subscribeToMechanics,
   getSchedulingConflicts,
-  getMechanicWorkload,
   type Job,
   type Mechanic,
   type ScheduledJob,
@@ -49,14 +45,15 @@ export default function Calendar() {
   const [activeJob, setActiveJob] = useState<Job | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-
   // State for data from Supabase
   const [jobs, setJobs] = useState<Job[]>([]);
   const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
   const [mechanics, setMechanics] = useState<Mechanic[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Refs for scroll syncing
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  const contentScrollRef = useRef<HTMLDivElement>(null);
 
   // Get active shop from context
   const { activeShop, isLoading: shopLoading } = useActiveShop();
@@ -80,7 +77,20 @@ export default function Calendar() {
         ]);
 
         setJobs(jobsData);
-        setMechanics(mechanicsData);
+        setMechanics([
+          ...mechanicsData,
+          ...Array.from({ length: 8 }, (_, i) => ({
+            id: `mock-${i}`,
+            shop_id: mechanicsData[0]?.shop_id ?? '',
+            name: `Test Mechanic ${i + 1}`,
+            avatar: `T${i + 1}`,
+            specialty: i % 3 === 0 ? 'Engine Specialist' : i % 3 === 1 ? 'Transmission' : 'General',
+            is_active: true,
+            user_id: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })),
+        ]);
         setScheduledJobs(scheduledJobsData);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -304,19 +314,9 @@ export default function Calendar() {
   };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollLeft, scrollWidth, clientWidth } = e.currentTarget;
-    setCanScrollLeft(scrollLeft > 0);
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
-  };
-
-  const scrollMechanics = (direction: 'left' | 'right') => {
-    const scrollContainer = document.querySelector('.mechanics-scroll-container') as HTMLElement;
-    if (scrollContainer) {
-      const scrollAmount = 200;
-      scrollContainer.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
+    // Sync the header to match the content scroll position
+    if (headerScrollRef.current) {
+      headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
     }
   };
 
@@ -357,18 +357,9 @@ export default function Calendar() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <style jsx>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
       <div className="min-h-screen bg-gray-50 flex">
         {/* Main Content */}
-        <div className="flex-1">
+        <div className="w-[70%] flex-shrink-0">
           <main className="p-6">
             {/* Date and Controls */}
             <div className="flex items-center justify-between mb-6">
@@ -433,50 +424,8 @@ export default function Calendar() {
               </div>
             </div>
 
-            {/* Mechanics Summary */}
-            <div className="mb-4 grid grid-cols-4 gap-4">
-              {mechanics.map((mechanic) => {
-                const workload = getMechanicWorkload(mechanic.id, scheduledJobs);
-                return (
-                  <div key={mechanic.id} className="bg-white p-3 rounded-lg border">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">
-                        {mechanic.name.split(" ")[0]}
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <Clock className="w-3 h-3 text-gray-400" />
-                        <span className="text-xs text-gray-500">
-                          {workload.hours}h
-                        </span>
-                        <Badge variant="secondary" className="text-xs">
-                          {workload.jobs} jobs
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
             {/* Scheduler Grid */}
             <div className="bg-white rounded-lg shadow-sm border overflow-hidden relative">
-              {/* Scroll Indicators */}
-              {canScrollLeft && (
-                <button
-                  onClick={() => scrollMechanics('left')}
-                  className="absolute left-20 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-300 rounded-full p-2 shadow-md hover:bg-gray-50 transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4 text-gray-600" />
-                </button>
-              )}
-              {canScrollRight && (
-                <button
-                  onClick={() => scrollMechanics('right')}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-300 rounded-full p-2 shadow-md hover:bg-gray-50 transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4 text-gray-600" />
-                </button>
-              )}
 
               {/* Header Row */}
               <div className="flex border-b">
@@ -486,14 +435,14 @@ export default function Calendar() {
                   </span>
                 </div>
 
-                <div 
-                  className="flex overflow-x-auto scrollbar-hide mechanics-scroll-container"
-                  onScroll={handleScroll}
+                <div
+                  ref={headerScrollRef}
+                  className="flex-1 min-w-0 flex overflow-hidden mechanics-scroll-container"
                 >
                   {mechanics.map((mechanic) => (
                     <div
                       key={mechanic.id}
-                      className="w-48 p-4 bg-gray-50 border-r last:border-r-0 flex-shrink-0"
+                      className="min-w-[192px] flex-1 p-4 bg-gray-50 border-r last:border-r-0"
                     >
                       <div className="flex items-center space-x-3">
                         <Avatar className="w-10 h-10">
@@ -548,14 +497,15 @@ export default function Calendar() {
                 </div>
 
                 {/* Mechanic schedule columns */}
-                <div 
-                  className="flex overflow-x-auto scrollbar-hide mechanics-scroll-container"
+                <div
+                  ref={contentScrollRef}
+                  className="flex-1 min-w-0 flex overflow-x-auto mechanics-scroll-container"
                   onScroll={handleScroll}
                 >
                   {mechanics.map((mechanic, mechanicIndex) => (
                     <div
                       key={mechanic.id}
-                      className="w-48 border-r last:border-r-0 relative flex-shrink-0"
+                      className="min-w-[192px] flex-1 border-r last:border-r-0 relative"
                     >
                       {Array.from({ length: 32 }, (_, timeIndex) => (
                         <DropZone
@@ -583,7 +533,7 @@ export default function Calendar() {
         </div>
 
         {/* Jobs Sidebar */}
-        <div className="w-80 bg-white border-l shadow-lg flex flex-col">
+        <div className="w-[30%] flex-shrink-0 bg-white border-l shadow-lg flex flex-col">
           <div className="p-4 border-b">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Jobs</h2>
