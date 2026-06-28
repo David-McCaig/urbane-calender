@@ -57,10 +57,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Load all memberships with shop info
+    // Load only the current user's memberships with shop info
     const { data, error } = await supabase
       .from('user_shop_memberships')
       .select('*, shop:shops(*)')
+      .eq('user_id', session.user.id)
       .order('created_at', { ascending: true });
 
     if (error) {

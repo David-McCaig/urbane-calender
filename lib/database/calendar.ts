@@ -170,11 +170,15 @@ export async function createScheduledJob(scheduledJobData: Omit<ScheduledJob, 'i
       job:jobs(*),
       mechanic:mechanics(*)
     `)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    console.error('Error creating scheduled job:', error);
+    console.error('Error creating scheduled job:', JSON.stringify(error));
     throw error;
+  }
+
+  if (!data) {
+    throw new Error('Failed to create scheduled job: no data returned');
   }
 
   return data;
@@ -190,11 +194,15 @@ export async function updateScheduledJob(id: string, updates: Partial<ScheduledJ
       job:jobs(*),
       mechanic:mechanics(*)
     `)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    console.error('Error updating scheduled job:', error);
+    console.error('Error updating scheduled job:', JSON.stringify(error));
     throw error;
+  }
+
+  if (!data) {
+    throw new Error(`Scheduled job ${id} not found — it may have been moved or deleted by another user`);
   }
 
   return data;
@@ -270,7 +278,8 @@ export function getSchedulingConflicts(
   job: Job,
   mechanicIndex: number,
   timeSlot: number,
-  existingJobs: ScheduledJob[]
+  existingJobs: ScheduledJob[],
+  mechanics: Mechanic[]
 ): string[] {
   const conflicts: string[] = [];
   const jobEndTime = timeSlot + job.duration * 4; // 4 slots per hour
@@ -279,8 +288,9 @@ export function getSchedulingConflicts(
     conflicts.push("Job extends beyond work hours (6 PM)");
   }
 
+  const targetMechanicId = mechanics[mechanicIndex]?.id;
   const overlappingJobs = existingJobs.filter((existingJob) => {
-    if (existingJob.mechanic_id !== existingJobs[mechanicIndex]?.mechanic_id) return false;
+    if (existingJob.mechanic_id !== targetMechanicId) return false;
 
     const existingStart = existingJob.time_slot;
     const existingEnd = existingJob.time_slot + existingJob.job.duration * 4;
