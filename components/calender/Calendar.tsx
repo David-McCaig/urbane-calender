@@ -77,20 +77,7 @@ export default function Calendar() {
         ]);
 
         setJobs(jobsData);
-        setMechanics([
-          ...mechanicsData,
-          ...Array.from({ length: 8 }, (_, i) => ({
-            id: `mock-${i}`,
-            shop_id: mechanicsData[0]?.shop_id ?? '',
-            name: `Test Mechanic ${i + 1}`,
-            avatar: `T${i + 1}`,
-            specialty: i % 3 === 0 ? 'Engine Specialist' : i % 3 === 1 ? 'Transmission' : 'General',
-            is_active: true,
-            user_id: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })),
-        ]);
+        setMechanics(mechanicsData);
         setScheduledJobs(scheduledJobsData);
       } catch (error) {
         console.error('Error loading data:', error);
