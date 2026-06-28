@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { acceptInvitation } from "@/lib/actions/membership";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,12 +29,9 @@ export function SignUpForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
-  const [inviteToken, setInviteToken] = useState(inviteTokenParam);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-
-  const showInviteToken = !!(inviteTokenParam || inviteToken);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +62,10 @@ export function SignUpForm({
       // sign-up success page so the user knows to check their email.
       if (!data.session) {
         router.push("/auth/sign-up-success");
+      } else if (inviteTokenParam) {
+        // Auto-accept the invitation and go straight to the app
+        await acceptInvitation(inviteTokenParam);
+        router.push("/protected");
       } else {
         router.push("/onboarding");
       }
@@ -134,27 +136,12 @@ export function SignUpForm({
                 />
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="invite-token">
-                  Invitation Token{" "}
-                  <span className="text-gray-400 font-normal">
-                    (join an existing shop)
-                  </span>
-                </Label>
-                <Input
-                  id="invite-token"
-                  type="text"
-                  placeholder="Paste your invitation link or token"
-                  value={inviteToken}
-                  onChange={(e) => setInviteToken(e.target.value)}
-                />
-                {showInviteToken && (
-                  <p className="text-xs text-gray-500">
-                    You&apos;ve been invited to join a shop. Complete sign-up to
-                    accept.
-                  </p>
-                )}
-              </div>
+              {inviteTokenParam && (
+                <p className="text-xs text-gray-500">
+                  You&apos;ve been invited to join a shop. Complete sign-up to
+                  accept.
+                </p>
+              )}
 
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Button type="submit" className="w-full" disabled={isLoading}>

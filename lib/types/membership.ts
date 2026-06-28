@@ -40,3 +40,18 @@ export interface Shop {
   created_at: string;
   updated_at: string;
 }
+
+/** Unified row for the members table — combines active members and invitations. */
+export interface MemberRow {
+  id: string;
+  name: string;
+  email: string | null;
+  role: MembershipRole;
+  status: 'active' | 'pending' | 'expired';
+  avatar: string;
+  joinedAt: string | null;
+  expiresAt: string | null;
+  isCurrentUser: boolean;
+  userId: string | null;
+  invitationId: string | null;
+}

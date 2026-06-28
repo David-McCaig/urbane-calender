@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { revalidatePath } from 'next/cache';
 import { randomBytes } from 'crypto';
+import { Resend } from 'resend';
 import type { MembershipRole, UserShopMembership, Invitation, Shop } from '@/lib/types/membership';
 
 // --- Helpers ---
@@ -255,13 +256,13 @@ export async function removeMember(userId: string): Promise<void> {
 // --- Invitations ---
 
 /**
- * Create an invitation for a new member. Returns the full invitation with token
- * so the UI can build a shareable URL.
+ * Create an invitation for a new member and email them the invite link via Resend.
+ * Falls back to returning the URL if email sending fails.
  */
 export async function createInvitation(
   email: string,
   role: MembershipRole
-): Promise<{ invitation: Invitation; inviteUrl: string }> {
+): Promise<{ invitation: Invitation; inviteUrl: string; emailSent: boolean }> {
   const { supabase, user } = await getCurrentUser();
   const shopId = user.user_metadata?.active_shop_id;
   if (!shopId) throw new Error('No active shop');
@@ -290,11 +291,33 @@ export async function createInvitation(
     throw new Error(`Failed to create invitation: ${error.message}`);
   }
 
-  // Build the invite URL — uses NEXT_PUBLIC_SITE_URL or falls back to a relative path
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
+  // Build the absolute invite URL
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
   const inviteUrl = `${baseUrl}/auth/accept-invitation?token=${token}`;
 
-  return { invitation: invitation as Invitation, inviteUrl };
+  // Send the invitation email via Resend
+  let emailSent = false;
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    await resend.emails.send({
+      from: 'MORTLE <hello@mortle.me>',
+      to: email.toLowerCase().trim(),
+      subject: "You're invited to join a shop",
+      text: `You've been invited to join a shop!
+
+Click the link below to accept the invitation and create your account:
+
+${inviteUrl}
+
+This invitation expires on ${expiresAt.toLocaleDateString()}.`,
+    });
+    emailSent = true;
+  } catch (sendError) {
+    // Email failed — still return the invite URL so the UI can fall back
+    console.error('Failed to send invitation email:', sendError);
+  }
+
+  return { invitation: invitation as Invitation, inviteUrl, emailSent };
 }
 
 /**

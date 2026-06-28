@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -19,8 +20,10 @@ export default async function AcceptInvitationPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Check if the invitation exists and is valid (for messaging)
-  const { data: invitation } = await supabase
+  // Use service client for invitation lookup — RLS restricts this to shop members,
+  // but invitees aren't members yet (or may not even be authenticated).
+  const serviceClient = createServiceClient();
+  const { data: invitation } = await serviceClient
     .from('invitations')
     .select('email, shop:shops(name)')
     .eq('token', token)

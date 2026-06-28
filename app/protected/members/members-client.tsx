@@ -35,22 +35,16 @@ import {
   Check,
   Users,
   UserPlus,
+  Clock,
 } from 'lucide-react';
-import type {
-  MembershipRole,
-  UserShopMembership,
-  Invitation,
-} from '@/lib/types/membership';
+import type { MembershipRole, MemberRow } from '@/lib/types/membership';
 
 interface MembersClientProps {
-  members: UserShopMembership[];
-  invitations: Invitation[];
-  currentUserId: string;
-  currentRole: string | null;
+  rows: MemberRow[];
+  currentRole: MembershipRole | null;
   shopId: string;
 }
 
-// shopId is available to child components via props if needed
 const ROLE_LABELS: Record<MembershipRole, string> = {
   owner: 'Owner',
   manager: 'Manager',
@@ -68,10 +62,14 @@ const ROLE_BADGE_VARIANT: Record<
 
 const ROLE_OPTIONS: MembershipRole[] = ['mechanic', 'manager', 'owner'];
 
+const STATUS_STYLES: Record<MemberRow['status'], { label: string; className: string }> = {
+  active: { label: 'Active', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+  pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
+  expired: { label: 'Expired', className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
+};
+
 export function MembersClient({
-  members,
-  invitations,
-  currentUserId,
+  rows,
   currentRole,
 }: MembersClientProps) {
   const router = useRouter();
@@ -81,7 +79,7 @@ export function MembersClient({
   // Invitation form state
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<MembershipRole>('mechanic');
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ inviteUrl: string; emailSent: boolean; email: string } | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -90,15 +88,18 @@ export function MembersClient({
   const [updatingUser, setUpdatingUser] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
 
+  const activeCount = rows.filter((r) => r.status === 'active').length;
+  const pendingCount = rows.filter((r) => r.status === 'pending').length;
+
   const handleCreateInvitation = async (e: React.FormEvent) => {
     e.preventDefault();
     setInviteError(null);
-    setInviteUrl(null);
+    setInviteResult(null);
     setInviteLoading(true);
 
     try {
       const result = await createInvitation(inviteEmail.trim(), inviteRole);
-      setInviteUrl(result.inviteUrl);
+      setInviteResult({ inviteUrl: result.inviteUrl, emailSent: result.emailSent, email: inviteEmail.trim() });
       setInviteEmail('');
       router.refresh();
     } catch (err: unknown) {
@@ -111,8 +112,8 @@ export function MembersClient({
   };
 
   const handleCopyUrl = async () => {
-    if (!inviteUrl) return;
-    await navigator.clipboard.writeText(inviteUrl);
+    if (!inviteResult?.inviteUrl) return;
+    await navigator.clipboard.writeText(inviteResult.inviteUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -157,16 +158,25 @@ export function MembersClient({
     }
   };
 
+  const isLastOwner = (row: MemberRow) =>
+    isOwner &&
+    row.role === 'owner' &&
+    rows.filter((r) => r.role === 'owner' && r.status === 'active').length === 1;
+
   return (
-    <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="h-6 w-6" />
-          Members
-        </h1>
-        <p className="text-gray-500 mt-1">
-          Manage who has access to your shop
-        </p>
+    <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Users className="h-6 w-6" />
+            Members
+          </h1>
+          <p className="text-gray-500 mt-1">
+            {activeCount} active member{activeCount !== 1 ? 's' : ''}
+            {pendingCount > 0 && ` · ${pendingCount} pending`}
+          </p>
+        </div>
       </div>
 
       {roleError && (
@@ -175,103 +185,16 @@ export function MembersClient({
         </div>
       )}
 
-      {/* Members List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Current Members</CardTitle>
-          <CardDescription>
-            {members.length} member{members.length !== 1 ? 's' : ''} in this
-            shop
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="divide-y">
-            {members.map((member) => {
-              const isCurrentUser = member.user_id === currentUserId;
-              const isLastOwner =
-                isOwner &&
-                member.role === 'owner' &&
-                members.filter((m) => m.role === 'owner').length === 1;
-
-              return (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-sm font-medium">
-                      {member.user_id.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium flex items-center gap-2">
-                        {member.user_id.slice(0, 8)}...
-                        {isCurrentUser && (
-                          <span className="text-xs text-gray-400">(you)</span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Joined {new Date(member.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {canManage && !isLastOwner ? (
-                      <Select
-                        value={member.role}
-                        onValueChange={(value: MembershipRole) =>
-                          handleRoleChange(member.user_id, value)
-                        }
-                        disabled={updatingUser === member.user_id}
-                      >
-                        <SelectTrigger className="h-8 w-[110px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ROLE_OPTIONS.map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {ROLE_LABELS[role]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge
-                        variant={ROLE_BADGE_VARIANT[member.role] || 'outline'}
-                      >
-                        <Shield className="h-3 w-3 mr-1" />
-                        {ROLE_LABELS[member.role]}
-                      </Badge>
-                    )}
-
-                    {isOwner && !isCurrentUser && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleRemove(member.user_id)}
-                      >
-                        <UserMinus className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Invitation Form */}
+      {/* Invite Form */}
       {canManage && (
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
               Invite Member
             </CardTitle>
             <CardDescription>
-              Generate an invitation link to share with new members
+              Send an invitation email to add someone to your shop
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -308,7 +231,7 @@ export function MembersClient({
                 </div>
                 <Button type="submit" disabled={inviteLoading}>
                   <Mail className="h-4 w-4 mr-2" />
-                  {inviteLoading ? 'Generating...' : 'Generate Link'}
+                  {inviteLoading ? 'Sending...' : 'Send Invitation'}
                 </Button>
               </div>
 
@@ -316,14 +239,24 @@ export function MembersClient({
                 <p className="text-sm text-red-500">{inviteError}</p>
               )}
 
-              {inviteUrl && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
-                  <p className="text-sm font-medium mb-2">
-                    Share this link with the invitee:
+              {inviteResult && (inviteResult.emailSent ? (
+                <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
+                  <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Invitation sent!
                   </p>
-                  <div className="flex items-center gap-2">
+                  <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                    An email with the sign-up link has been sent to{' '}
+                    <strong>{inviteResult.email}</strong>.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                  <p className="text-sm font-medium mb-1 text-amber-700 dark:text-amber-400">
+                    Email could not be sent. Share this link manually:
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
                     <Input
-                      value={inviteUrl}
+                      value={inviteResult.inviteUrl}
                       readOnly
                       className="text-xs font-mono"
                     />
@@ -341,53 +274,154 @@ export function MembersClient({
                       )}
                     </Button>
                   </div>
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    This link expires in 7 days.
-                  </p>
                 </div>
-              )}
+              ))}
             </form>
-
-            {/* Pending Invitations */}
-            {invitations.length > 0 && (
-              <div className="mt-6 border-t pt-4">
-                <h4 className="text-sm font-medium mb-2">
-                  Pending Invitations ({invitations.length})
-                </h4>
-                <div className="space-y-2">
-                  {invitations.map((inv) => (
-                    <div
-                      key={inv.id}
-                      className="flex items-center justify-between text-sm"
-                    >
-                      <div>
-                        <span>{inv.email}</span>
-                        <Badge variant="outline" className="ml-2 text-xs">
-                          {ROLE_LABELS[inv.role]}
-                        </Badge>
-                        <span className="text-xs text-gray-400 ml-2">
-                          Expires{' '}
-                          {new Date(inv.expires_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      {isOwner && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-gray-400 hover:text-red-500"
-                          onClick={() => handleDeleteInvitation(inv.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
+
+      {/* Members Table */}
+      <Card>
+        <CardContent className="p-0">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b text-xs text-gray-500 uppercase tracking-wider">
+                <th className="text-left font-medium px-4 py-3">Name</th>
+                <th className="text-left font-medium px-4 py-3 w-[120px]">Role</th>
+                <th className="text-left font-medium px-4 py-3 w-[100px]">Status</th>
+                <th className="text-left font-medium px-4 py-3 w-[130px]">Joined</th>
+                <th className="text-right font-medium px-4 py-3 w-[60px]"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center text-gray-400 py-12">
+                    No members yet. Invite someone to get started.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row) => {
+                  const isCurrentUser = row.isCurrentUser;
+                  const isLastOwnerRow = isLastOwner(row);
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                    >
+                      {/* Name + Avatar */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-medium shrink-0">
+                            {row.avatar}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate flex items-center gap-2">
+                              {row.name}
+                              {isCurrentUser && (
+                                <span className="text-xs text-gray-400 font-normal">(you)</span>
+                              )}
+                            </p>
+                            {row.email && (
+                              <p className="text-xs text-gray-400 truncate">
+                                {row.email}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Role */}
+                      <td className="px-4 py-3">
+                        {row.status === 'active' && canManage && !isLastOwnerRow ? (
+                          <Select
+                            value={row.role}
+                            onValueChange={(value: MembershipRole) =>
+                              handleRoleChange(row.userId!, value)
+                            }
+                            disabled={updatingUser === row.userId}
+                          >
+                            <SelectTrigger className="h-7 w-[110px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ROLE_OPTIONS.map((role) => (
+                                <SelectItem key={role} value={role}>
+                                  {ROLE_LABELS[role]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge
+                            variant={ROLE_BADGE_VARIANT[row.role] || 'outline'}
+                            className="text-xs"
+                          >
+                            <Shield className="h-3 w-3 mr-1" />
+                            {ROLE_LABELS[row.role]}
+                          </Badge>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[row.status].className}`}
+                        >
+                          {row.status === 'pending' && <Clock className="h-3 w-3" />}
+                          {STATUS_STYLES[row.status].label}
+                        </span>
+                      </td>
+
+                      {/* Joined / Expires */}
+                      <td className="px-4 py-3">
+                        {row.joinedAt ? (
+                          <span className="text-xs text-gray-500">
+                            {new Date(row.joinedAt).toLocaleDateString()}
+                          </span>
+                        ) : row.expiresAt ? (
+                          <span className="text-xs text-gray-500">
+                            Expires {new Date(row.expiresAt).toLocaleDateString()}
+                          </span>
+                        ) : null}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3 text-right">
+                        {row.status === 'active' && isOwner && !isCurrentUser && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-gray-400 hover:text-red-500"
+                            onClick={() => handleRemove(row.userId!)}
+                            title="Remove member"
+                          >
+                            <UserMinus className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {(row.status === 'pending' || row.status === 'expired') &&
+                          isOwner && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-gray-400 hover:text-red-500"
+                              onClick={() => handleDeleteInvitation(row.invitationId!)}
+                              title="Cancel invitation"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
