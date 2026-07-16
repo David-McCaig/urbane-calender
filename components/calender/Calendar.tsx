@@ -6,6 +6,7 @@ import {
   DndContext,
   DragOverlay,
   closestCenter,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import { useActiveShop } from "@/lib/context/shop-context";
 import { useCalendarData } from "./use-calendar-data";
@@ -13,6 +14,7 @@ import { CalendarGrid } from "./calendar-grid";
 import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
 import { WorkOrdersSidebar } from "./jobs-sidebar";
 import { JobsSidebarSkeleton } from "./jobs-sidebar-skeleton";
+import JobsPanel, { HARDCODED_JOBS_MAP } from "./JobsPanel";
 
 export default function Calendar() {
   const { activeShop, isLoading: shopLoading } = useActiveShop();
@@ -36,6 +38,28 @@ export default function Calendar() {
     handleDragEnd,
     removeScheduledJob,
   } = useCalendarData(activeShop);
+
+  // Prototype hardcoded job drag overlay (separate from Lightspeed/scheduled job overlay)
+  const [hardcodedDragOverlay, setHardcodedDragOverlay] = useState<{
+    title: string;
+    subtitle: string;
+  } | null>(null);
+
+  const wrappedHandleDragStart = (event: DragStartEvent) => {
+    const dragId = event.active.id as string;
+    const hardcodedJob = HARDCODED_JOBS_MAP.get(dragId);
+    if (hardcodedJob) {
+      setHardcodedDragOverlay({
+        title: hardcodedJob.hook_in,
+        subtitle: `Customer ${hardcodedJob.customer_id} • ${hardcodedJob.duration}h`,
+      });
+      return;
+    }
+    handleDragStart(event);
+  };
+
+  // Merge drag overlays — hardcoded takes priority, then Lightspeed/scheduled
+  const dragOverlay = hardcodedDragOverlay || activeDragOverlay;
 
   // UI-only local state
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -82,8 +106,11 @@ export default function Calendar() {
   return (
     <DndContext
       collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
+      onDragStart={wrappedHandleDragStart}
+      onDragEnd={(event) => {
+        setHardcodedDragOverlay(null);
+        handleDragEnd(event);
+      }}
     >
       <div className="min-h-screen bg-gray-50 flex">
         <CalendarGrid
@@ -114,14 +141,16 @@ export default function Calendar() {
           onDateSelect={setWorkOrdersDate}
         />
 
+        <JobsPanel />
+
         <DragOverlay>
-          {activeDragOverlay ? (
+          {dragOverlay ? (
             <div className="p-3 bg-blue-100 border-2 border-blue-300 rounded-lg shadow-lg">
               <div className="font-medium text-sm text-blue-900">
-                {activeDragOverlay.title}
+                {dragOverlay.title}
               </div>
               <div className="text-xs text-blue-700">
-                {activeDragOverlay.subtitle}
+                {dragOverlay.subtitle}
               </div>
             </div>
           ) : null}
