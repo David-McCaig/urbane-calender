@@ -1,7 +1,7 @@
--- Seed data for development and testing
--- Squashed from migrations 20241201–20260628
+-- Reference seed data — runs during migrations (both local `db reset` and live `db push`).
+-- No auth dependency — shop, mechanics, memberships, and jobs live in supabase/seed.sql.
 
--- 1. Work order statuses (global) -------------------------------------------
+-- Work order statuses (global) -----------------------------------------------
 
 INSERT INTO work_order_statuses (id, name, description, color) VALUES
   ('550e8400-e29b-41d4-a716-446655440001', 'New', 'New work order created', '#3B82F6'),
@@ -11,65 +11,3 @@ INSERT INTO work_order_statuses (id, name, description, color) VALUES
   ('550e8400-e29b-41d4-a716-446655440005', 'Completed', 'Work has been completed', '#10B981'),
   ('550e8400-e29b-41d4-a716-446655440006', 'Cancelled', 'Work order has been cancelled', '#DC2626')
 ON CONFLICT (id) DO NOTHING;
-
--- 2. Sample shop ------------------------------------------------------------
-
-INSERT INTO shops (id, name, address, phone, email) VALUES
-  ('43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Urbane Cyclist', '123 Main Street, City, State 12345', '(555) 123-4567', 'contact@urbanecyclist.com')
-ON CONFLICT (id) DO NOTHING;
-
--- 3. Sample mechanics -------------------------------------------------------
-
-INSERT INTO mechanics (id, shop_id, name, avatar, specialty) VALUES
-  ('750e8400-e29b-41d4-a716-446655440001', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Em Kieffer', 'EK', 'Service Writer'),
-  ('750e8400-e29b-41d4-a716-446655440002', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Rory Hiles', 'RH', 'Service Writer'),
-  ('750e8400-e29b-41d4-a716-446655440003', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Nestor Czernysz', 'NC', 'Mechanic'),
-  ('750e8400-e29b-41d4-a716-446655440004', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Silum Zhang', 'SZ', 'Mechanic'),
-  ('750e8400-e29b-41d4-a716-446655440005', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'Sasha Fabrikant', 'SF', 'Service Lead')
-ON CONFLICT (id) DO NOTHING;
-
--- 4. Sample jobs ------------------------------------------------------------
-
-INSERT INTO jobs (id, shop_id, workorder_id, time_in, eta_out, customer_id, hook_in, workorder_status_id, sale_id, sale_line_id, duration) VALUES
-  ('850e8400-e29b-41d4-a716-446655440001', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'WO-001', '2024-12-01 15:11:28+00:00', '2024-12-01 16:11:28+00:00', 'CUST-001', 'Oil Change', '550e8400-e29b-41d4-a716-446655440005', '0', 'SL-001', 1),
-  ('850e8400-e29b-41d4-a716-446655440002', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'WO-002', '2024-12-01 14:00:00+00:00', '2024-12-01 16:00:00+00:00', 'CUST-002', 'Brake Repair', '550e8400-e29b-41d4-a716-446655440005', '0', 'SL-002', 1),
-  ('850e8400-e29b-41d4-a716-446655440003', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'WO-003', '2024-12-01 13:30:00+00:00', '2024-12-01 15:00:00+00:00', 'CUST-003', 'Engine Diagnostic', '550e8400-e29b-41d4-a716-446655440005', '0', 'SL-003', 1),
-  ('850e8400-e29b-41d4-a716-446655440004', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'WO-004', '2024-12-01 10:00:00+00:00', '2024-12-01 13:00:00+00:00', 'CUST-004', 'Transmission Service', '550e8400-e29b-41d4-a716-446655440001', '0', 'SL-004', 3),
-  ('850e8400-e29b-41d4-a716-446655440005', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'WO-005', '2024-12-01 09:00:00+00:00', '2024-12-01 11:00:00+00:00', 'CUST-005', 'Tire Rotation', '550e8400-e29b-41d4-a716-446655440001', '0', 'SL-005', 2),
-  ('850e8400-e29b-41d4-a716-446655440006', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', 'WO-006', '2024-12-01 08:30:00+00:00', '2024-12-01 10:30:00+00:00', 'CUST-006', 'AC Repair', '550e8400-e29b-41d4-a716-446655440002', '0', 'SL-006', 2)
-ON CONFLICT (id) DO NOTHING;
-
--- 5. Sample scheduled jobs --------------------------------------------------
-
-INSERT INTO scheduled_jobs (id, job_id, shop_id, mechanic_id, time_slot, date) VALUES
-  ('950e8400-e29b-41d4-a716-446655440001', '850e8400-e29b-41d4-a716-446655440004', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', '750e8400-e29b-41d4-a716-446655440003', 4, '2024-12-01'),
-  ('950e8400-e29b-41d4-a716-446655440002', '850e8400-e29b-41d4-a716-446655440005', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', '750e8400-e29b-41d4-a716-446655440004', 0, '2024-12-01'),
-  ('950e8400-e29b-41d4-a716-446655440003', '850e8400-e29b-41d4-a716-446655440006', '43f783d1-15b4-4ec5-ada0-3f25ac8e5445', '750e8400-e29b-41d4-a716-446655440005', 2, '2024-12-01')
-ON CONFLICT (id) DO NOTHING;
-
--- 6. Backfill existing auth users into memberships --------------------------
-
-INSERT INTO user_shop_memberships (user_id, shop_id, role)
-SELECT
-  id AS user_id,
-  (raw_user_meta_data->>'shop_id')::UUID AS shop_id,
-  'owner' AS role
-FROM auth.users
-WHERE raw_user_meta_data->>'shop_id' IS NOT NULL
-  AND (raw_user_meta_data->>'shop_id')::UUID IS NOT NULL
-ON CONFLICT (user_id, shop_id) DO NOTHING;
-
--- 7. Developer membership seed ----------------------------------------------
-
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM auth.users WHERE id = 'faf50c1c-3ba1-40c6-b798-08a3c99c72f6') THEN
-    INSERT INTO user_shop_memberships (user_id, shop_id, role)
-    VALUES (
-      'faf50c1c-3ba1-40c6-b798-08a3c99c72f6',
-      '43f783d1-15b4-4ec5-ada0-3f25ac8e5445',
-      'manager'
-    )
-    ON CONFLICT (user_id, shop_id) DO NOTHING;
-  END IF;
-END $$;
