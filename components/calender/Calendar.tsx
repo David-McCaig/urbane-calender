@@ -10,7 +10,9 @@ import {
 import { useActiveShop } from "@/lib/context/shop-context";
 import { useCalendarData } from "./use-calendar-data";
 import { CalendarGrid } from "./calendar-grid";
+import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
 import { JobsSidebar } from "./jobs-sidebar";
+import { JobsSidebarSkeleton } from "./jobs-sidebar-skeleton";
 import { JobEntryForm } from "./job-entry-form";
 
 export default function Calendar() {
@@ -44,11 +46,13 @@ export default function Calendar() {
   // Loading state — shop context still resolving
   if (shopLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading calendar...</p>
+      <div className="min-h-screen bg-gray-50 flex">
+        <div className="w-[70%] flex-shrink-0">
+          <main className="p-6">
+            <CalendarGridSkeleton />
+          </main>
         </div>
+        <JobsSidebarSkeleton />
       </div>
     );
   }
