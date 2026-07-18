@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getErrorMessage } from '@/lib/error-utils';
 import { acceptInvitation } from '@/lib/actions/membership';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +33,7 @@ export function AcceptInvitationForm({
       router.refresh();
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : 'Failed to accept invitation'
+        getErrorMessage(err, 'Failed to accept invitation')
       );
     } finally {
       setIsLoading(false);

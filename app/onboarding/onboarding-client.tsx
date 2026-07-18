@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getErrorMessage } from '@/lib/error-utils';
 import { createShopAndMembership } from '@/lib/actions/membership';
 import { acceptInvitation } from '@/lib/actions/membership';
 import { createClient } from '@/lib/supabase/client';
@@ -38,7 +39,7 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
       router.push('/protected');
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : 'Failed to create shop'
+        getErrorMessage(err, 'Failed to create shop')
       );
       setIsLoading(false);
     }
@@ -67,7 +68,7 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
       router.push('/protected');
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : 'Failed to accept invitation'
+        getErrorMessage(err, 'Failed to accept invitation')
       );
       setIsLoading(false);
     }
