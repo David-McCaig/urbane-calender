@@ -31,6 +31,43 @@ export async function getCurrentShopId(): Promise<string | null> {
   }
 }
 
+/**
+ * Resolve the active shop for the current user.
+ *
+ * 1. Tries user_metadata.active_shop_id first (set by switchActiveShop, onboarding, etc.)
+ * 2. Falls back to the user's first membership (ordered by created_at)
+ * 3. Persists the resolved shop ID to user_metadata so subsequent requests are fast
+ *
+ * Returns the shop ID, or null if the user has no memberships.
+ * Throws if the user is not authenticated — callers should catch and redirect to /auth/login.
+ */
+export async function resolveActiveShop(): Promise<string | null> {
+  const { supabase, user } = await getCurrentUser();
+
+  // Try metadata first
+  let shopId = user.user_metadata?.active_shop_id as string | undefined;
+
+  if (!shopId) {
+    // Fall back to the user's first membership
+    const { data: memberships } = await supabase
+      .from('user_shop_memberships')
+      .select('shop_id')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (memberships && memberships.length > 0) {
+      shopId = memberships[0].shop_id;
+      // Persist so subsequent requests don't need the fallback query
+      await supabase.auth.updateUser({
+        data: { active_shop_id: shopId },
+      });
+    }
+  }
+
+  return shopId ?? null;
+}
+
 // --- Shop Management ---
 
 /**
