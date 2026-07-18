@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ShopSwitcher } from '@/components/shop-switcher';
 import { LogoutButton } from '@/components/logout-button';
-import { ThemeSwitcher } from '@/components/theme-switcher';
 import { cn } from '@/lib/utils';
 
 export function Navbar() {
@@ -36,7 +35,6 @@ export function Navbar() {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <ThemeSwitcher />
           <LogoutButton />
         </div>
       </div>
