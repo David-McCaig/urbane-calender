@@ -19,6 +19,39 @@ These rules apply to all error handling in this Next.js App Router project. Foll
 ❌ Client Component event handler throws   → error.tsx does NOT help
 ```
 
+## Development: the error overlay hides error.tsx
+
+In `next dev`, Next.js renders its own error overlay (the red dialog with the stack trace) **on top of** the `error.tsx` component. The error.tsx is still rendered in the DOM behind it. This is intentional — the overlay gives developers debugging details that the user-friendly ErrorCard intentionally hides.
+
+**To see the error.tsx component in development**, dismiss the overlay by pressing **Escape** or clicking the **X** button. The ErrorCard will be visible behind it.
+
+In production (`next build && next start`), the overlay is absent and only the ErrorCard renders.
+
+## Don't catch too broadly — let errors reach the boundary
+
+**Only catch specific errors you intend to handle.** A broad `catch { }` that swallows everything prevents the `error.tsx` boundary from ever firing.
+
+```tsx
+// ✅ Correct — only redirects on auth failures, re-throws network errors
+try {
+  shopId = await resolveActiveShop();
+} catch (err: unknown) {
+  if (err instanceof Error && err.message === 'Not authenticated') {
+    redirect('/auth/login');
+  }
+  throw err;
+}
+
+// ❌ Wrong — swallows network errors, Supabase errors, everything
+try {
+  shopId = await resolveActiveShop();
+} catch {
+  redirect('/auth/login');
+}
+```
+
+The same principle applies to any data-fetching Server Component: if you catch an error, handle only the specific error type you care about and re-throw the rest so `error.tsx` can display the fallback UI.
+
 ## Use the shared ErrorCard component
 
 The project has an `ErrorCard` component at `components/ui/error-card.tsx`. Always use it for error boundaries — never inline error UIs:
