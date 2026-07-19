@@ -1,15 +1,12 @@
--- Add Lightspeed OAuth integration support
--- Stores encrypted OAuth tokens per shop for Lightspeed API access.
--- Uses Supabase Vault (pgsodium) for transparent column encryption.
+-- Add Lightspeed OAuth integration support (no Vault dependency)
+-- Creates lightspeed_integrations table without pgsodium TCE.
+-- Tokens are protected by RLS (owners/managers only).
+-- Vault encryption can be added later when plan supports it.
 
 -- 0. Add Lightspeed account ID to shops for sync
 ALTER TABLE shops ADD COLUMN IF NOT EXISTS lightspeed_account_id TEXT;
 
--- 1. Enable extensions
-CREATE EXTENSION IF NOT EXISTS pgsodium CASCADE;
-CREATE EXTENSION IF NOT EXISTS supabase_vault CASCADE;
-
--- 2. Create table
+-- 1. Create table
 CREATE TABLE IF NOT EXISTS lightspeed_integrations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
@@ -32,16 +29,7 @@ CREATE TRIGGER update_lightspeed_integrations_updated_at
   BEFORE UPDATE ON lightspeed_integrations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- 3. Transparent Column Encryption via Supabase Vault
--- Each row's token columns are encrypted at rest using a key derived from the row id.
--- Application code reads/writes plaintext — encryption/decryption is transparent.
-SECURITY LABEL FOR pgsodium ON COLUMN lightspeed_integrations.access_token
-  IS 'ENCRYPT WITH KEY COLUMN lightspeed_integrations.id';
-
-SECURITY LABEL FOR pgsodium ON COLUMN lightspeed_integrations.refresh_token
-  IS 'ENCRYPT WITH KEY COLUMN lightspeed_integrations.id';
-
--- 4. RLS — role-gated
+-- 2. RLS — role-gated
 ALTER TABLE lightspeed_integrations ENABLE ROW LEVEL SECURITY;
 
 -- Any member can initiate OAuth connect (INSERT their own shop's tokens)
@@ -73,5 +61,11 @@ CREATE POLICY "Owners can delete integrations" ON lightspeed_integrations
     AND get_user_shop_role() = 'owner'
   );
 
--- 5. Grants
+-- 3. Grants
 GRANT ALL ON lightspeed_integrations TO authenticated;
+
+-- 4. Add to realtime publication (if not already)
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE lightspeed_integrations;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
