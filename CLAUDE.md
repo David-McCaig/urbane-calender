@@ -2,7 +2,7 @@
 
 ## Project overview
 
-Urbane Calendar is a multi-tenant auto repair shop scheduling app. Shop owners, managers, and mechanics use it to manage work orders and schedule jobs on a daily calendar view with drag-and-drop.
+Urbane Calendar is a multi-tenant scheduling app for bicycle shop service/repair departments. It connects to Lightspeed (point-of-sale) via the Lightspeed API to pull in work orders, then provides a drag-and-drop calendar view for scheduling mechanics and managing jobs. Think of it as an improved scheduling UI on top of Lightspeed's data.
 
 ## Tech stack
 
