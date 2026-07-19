@@ -19,6 +19,11 @@ import {
   type ScheduledJob,
 } from "@/lib/database/calendar";
 
+/** Format a Date as YYYY-MM-DD in the local timezone — avoids the UTC shift of toISOString(). */
+function formatLocalDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 interface UseCalendarDataReturn {
   // Data
   mechanics: Mechanic[];
@@ -58,7 +63,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   useEffect(() => {
     if (!activeShop) return;
 
-    const dateStr = currentDate.toISOString().split("T")[0];
+    const dateStr = formatLocalDate(currentDate);
 
     // Mechanics → unblocks the grid
     setLoadingGrid(true);
@@ -91,7 +96,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
 
     const scheduledJobsSubscription = subscribeToScheduledJobs(activeShop.id, (payload) => {
       console.log("Scheduled jobs changed:", payload);
-      getScheduledJobs(currentDateRef.current.toISOString().split("T")[0])
+      getScheduledJobs(formatLocalDate(currentDateRef.current))
         .then(setScheduledJobs)
         .catch(console.error);
     });
@@ -163,7 +168,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     if (!job) return;
 
     const dropZoneId = over.id as string;
-    const dateString = currentDate.toISOString().split("T")[0];
+    const dateString = formatLocalDate(currentDate);
 
     // Handle dropping back to unscheduled jobs
     if (dropZoneId === "unscheduled-jobs") {
@@ -258,7 +263,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   };
 
   const removeScheduledJob = async (scheduledJobId: string) => {
-    const dateString = currentDate.toISOString().split("T")[0];
+    const dateString = formatLocalDate(currentDate);
     // Optimistically remove from the grid — synchronous, paints immediately
     setScheduledJobs((prev) => prev.filter((sj) => sj.id !== scheduledJobId));
     try {
