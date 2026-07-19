@@ -111,24 +111,100 @@ supabase db reset
 supabase db reset --linked
 ```
 
+## Local Development with Docker
+
+The Supabase CLI runs a full local Supabase stack in Docker. This gives you an isolated development database — no risk of affecting production data.
+
+**Prerequisites:** Docker Desktop + Supabase CLI installed.
+
+### Quick start
+
+```bash
+# One command to start everything and seed the DB:
+./scripts/dev-local.sh
+
+# Or manually:
+supabase start          # Start local Supabase in Docker
+supabase db reset       # Apply migrations + seed data locally
+```
+
+### Configure environment
+
+Use the `switch-env` Claude skill to toggle between local and production:
+
+```bash
+# Ask Claude: "switch to local" (or run /switch-env local)
+# This creates .env.development.local with local keys automatically.
+
+# To go back: "switch to production" (or /switch-env production)
+# This removes .env.development.local so .env.local takes over.
+```
+
+**How it works:** `.env.development.local` has the highest priority in Next.js dev mode. It overrides `.env.local`. The skill writes or removes this file. No manual editing needed.
+
+See `.env.example` and `.claude/skills/switch-env/SKILL.md` for details.
+
+### Useful commands
+
+| Command | What it does |
+|---|---|
+| `supabase start` | Start local Supabase in Docker |
+| `supabase stop` | Stop all local Docker containers |
+| `supabase status` | Show running services and their URLs |
+| `supabase db reset` | Drop DB, re-run migrations, re-seed |
+| `npm run dev` | Start the Next.js app |
+| `supabase db push` | Push migrations to the linked remote project |
+
+### Local services
+
+| Service | Local URL |
+|---|---|
+| API (REST + Auth) | `http://127.0.0.1:54321` |
+| Studio (dashboard) | `http://127.0.0.1:54323` |
+| Inbucket (email capture) | `http://127.0.0.1:54324` |
+| Database (direct) | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
+
+## Switching Between Local and Production
+
+Use the `switch-env` skill — no manual env file editing.
+
+### Switch to local
+
+```
+/switch-env local
+npm run dev
+```
+
+This creates `.env.development.local` with your local Supabase keys (parsed from `supabase status`). Next.js auto-loads it in dev mode with highest priority.
+
+### Switch to production
+
+```
+/switch-env production
+npm run dev
+```
+
+This removes `.env.development.local`. Your `.env.local` (production values) takes over.
+
+### What's happening
+
+Next.js env load order in dev (later overrides earlier):
+
+1. `.env` — committed defaults
+2. `.env.development` — dev-only (not used by this project)
+3. `.env.local` — **always loaded** (production values live here)  
+4. `.env.development.local` — **dev-only, highest priority** (written by skill)
+
+When `.env.development.local` exists → local Supabase. When it doesn't → production Supabase.
+
 ## Development
 
 ### Adding new migrations
 
 1. Create a new migration file in `supabase/migrations/` with the format: `YYYYMMDDHHMMSS_description.sql`
-2. Apply the migration: `supabase db push`
-3. Test thoroughly before deploying to production
-
-### Local development
-
-For local development, you can start Supabase locally:
-
-```bash
-# Start Supabase locally
-supabase start
-
-# This will give you local URLs and keys to use in your .env.local
-```
+2. Test locally: `supabase db reset`
+3. Deploy to production: `supabase db push`
+4. Test thoroughly before deploying to production
 
 ## Production Considerations
 
