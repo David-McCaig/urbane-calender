@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getErrorMessage } from '@/lib/error-utils';
 import { setActiveShop } from '@/lib/actions/membership';
+import { initiateLightspeedAuth } from '@/lib/actions/lightspeed';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -29,7 +30,7 @@ export function LightspeedConnectForm({ shopId }: LightspeedConnectFormProps) {
     setError(null);
     try {
       await setActiveShop(shopId);
-      router.push('/api/lightspeed/authorize');
+      await initiateLightspeedAuth(shopId);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to connect. Please try again.'));
       setIsConnecting(false);

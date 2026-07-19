@@ -32,10 +32,6 @@ export async function GET() {
     'client_id',
     process.env.LIGHTSPEED_CLIENT_ID!,
   );
-  authorizeUrl.searchParams.set(
-    'redirect_uri',
-    process.env.LIGHTSPEED_REDIRECT_URI!,
-  );
   authorizeUrl.searchParams.set('scope', 'employee:all');
   authorizeUrl.searchParams.set('state', state);
 

@@ -26,7 +26,7 @@ export default async function MembersPage() {
 
   // Get current user's role, all members, and invitations via shared helpers
   const [currentRole, members, invitations] = await Promise.all([
-    getCurrentUserRole(),
+    getCurrentUserRole(shopId),
     getShopMembers(),
     getShopInvitations(),
   ]);

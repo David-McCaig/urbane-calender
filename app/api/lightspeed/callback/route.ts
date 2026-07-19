@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   // 2. Exchange authorization code for tokens
   const tokenResponse = await fetch(
-    'https://cloud.lightspeedapp.com/oauth/access_token.php',
+    'https://cloud.lightspeedapp.com/auth/oauth/token',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -35,7 +36,6 @@ export async function GET(request: NextRequest) {
         client_secret: process.env.LIGHTSPEED_CLIENT_SECRET,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: process.env.LIGHTSPEED_REDIRECT_URI,
       }),
     },
   );
@@ -54,26 +54,31 @@ export async function GET(request: NextRequest) {
 
   const tokens = await tokenResponse.json();
 
-  // 3. Get current user and active shop
+  // 3. Get current user
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
+    console.error('[Lightspeed Callback] No user in session');
     return NextResponse.redirect(new URL('/auth/login', baseUrl));
   }
 
-  const shopId = user.user_metadata?.active_shop_id as string | undefined;
+  const shopId = request.cookies.get('lightspeed_oauth_shop_id')?.value;
   if (!shopId) {
+    console.error('[Lightspeed Callback] No shop_id cookie found');
     return NextResponse.redirect(new URL('/onboarding', baseUrl));
   }
 
-  // 4. Store tokens using upsert
+  console.log('[Lightspeed Callback] Storing tokens for shop:', shopId);
+
+  // 4. Store tokens using service client (bypasses RLS — user auth verified above)
+  const serviceClient = createServiceClient();
   const expiresIn = tokens.expires_in ?? 3600;
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  const { error: dbError } = await supabase
+  const { error: dbError } = await serviceClient
     .from('lightspeed_integrations')
     .upsert(
       {
@@ -88,23 +93,27 @@ export async function GET(request: NextRequest) {
     );
 
   if (dbError) {
-    console.error('Failed to store Lightspeed tokens:', dbError);
+    console.error('[Lightspeed Callback] DB upsert failed:', dbError);
     return NextResponse.redirect(
       new URL('/protected?error=lightspeed_store_failed', baseUrl),
     );
   }
 
-  // Sync Lightspeed account ID to shops table
+  console.log('[Lightspeed Callback] Tokens stored successfully');
+
+  // Sync Lightspeed account ID to shops table (also uses service client — RLS on shops is restrictive)
   if (accountId) {
-    const { error: shopUpdateError } = await supabase
+    const { error: shopUpdateError } = await serviceClient
       .from('shops')
       .update({ lightspeed_account_id: accountId })
       .eq('id', shopId);
     if (shopUpdateError) {
       console.error(
-        'Failed to sync Lightspeed account ID to shop:',
+        '[Lightspeed Callback] Failed to sync account ID to shop:',
         shopUpdateError,
       );
+    } else {
+      console.log('[Lightspeed Callback] Account ID synced to shop:', accountId);
     }
   }
 
@@ -113,6 +122,10 @@ export async function GET(request: NextRequest) {
     new URL('/protected?lightspeed=connected', baseUrl),
   );
   response.cookies.set('lightspeed_oauth_state', '', {
+    maxAge: 0,
+    path: '/',
+  });
+  response.cookies.set('lightspeed_oauth_shop_id', '', {
     maxAge: 0,
     path: '/',
   });

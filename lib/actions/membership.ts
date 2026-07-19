@@ -175,18 +175,20 @@ export async function switchActiveShop(shopId: string): Promise<void> {
 
 /**
  * Get the current user's role in their active shop.
+ * Accepts optional shopId to avoid JWT metadata propagation issues
+ * (updateUser cookie sets silently fail in Server Components).
  */
-export async function getCurrentUserRole(): Promise<MembershipRole | null> {
+export async function getCurrentUserRole(shopId?: string): Promise<MembershipRole | null> {
   try {
     const { supabase, user } = await getCurrentUser();
-    const shopId = user.user_metadata?.active_shop_id;
-    if (!shopId) return null;
+    const resolvedShopId = shopId || user.user_metadata?.active_shop_id;
+    if (!resolvedShopId) return null;
 
     const { data, error } = await supabase
       .from('user_shop_memberships')
       .select('role')
       .eq('user_id', user.id)
-      .eq('shop_id', shopId)
+      .eq('shop_id', resolvedShopId)
       .single();
 
     if (error || !data) return null;

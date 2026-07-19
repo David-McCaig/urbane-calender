@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { LightspeedIntegration, LightspeedWorkOrder } from './types';
 
 const LIGHTSPEED_TOKEN_URL =
-  'https://cloud.lightspeedapp.com/oauth/access_token.php';
+  'https://cloud.lightspeedapp.com/auth/oauth/token';
 
 const LIGHTSPEED_API_BASE = 'https://api.lightspeedapp.com/API/Account';
 
@@ -16,7 +16,7 @@ const FIVE_MIN_MS = 5 * 60 * 1000;
 export async function getValidAccessToken(
   shopId: string,
 ): Promise<string | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: integration, error } = await supabase
     .from('lightspeed_integrations')
@@ -76,7 +76,7 @@ async function refreshAccessToken(
     Date.now() + (tokens.expires_in || 3600) * 1000,
   ).toISOString();
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   await supabase
     .from('lightspeed_integrations')
     .update({
@@ -98,7 +98,7 @@ async function refreshAccessToken(
 export async function fetchLightspeedWorkOrders(
   shopId: string,
 ): Promise<LightspeedWorkOrder[] | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   // Read Lightspeed account ID from shops table (source of truth)
   const { data: shop, error } = await supabase
