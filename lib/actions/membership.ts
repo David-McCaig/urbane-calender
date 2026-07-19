@@ -121,18 +121,25 @@ export async function createShopAndMembership(shopName: string): Promise<Shop> {
     console.error('Failed to auto-create mechanic record:', mechErr);
   }
 
-  // Set active shop in user_metadata so RLS picks it up on subsequent requests
-  const supabase = await createClient();
-  const { error: updateError } = await supabase.auth.updateUser({
-    data: { active_shop_id: shop.id },
-  });
-
-  if (updateError) {
-    throw new Error(`Failed to set active shop: ${updateError.message}`);
-  }
-
-  revalidatePath('/', 'layout');
   return shop;
+}
+
+/**
+ * Set the active shop without membership validation.
+ * Used during onboarding when the shop has just been created and the
+ * client needs to set active_shop_id before navigating to Lightspeed OAuth
+ * or the protected route. Does not validate membership — callers must
+ * ensure the user is a member of the shop.
+ */
+export async function setActiveShop(shopId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({
+    data: { active_shop_id: shopId },
+  });
+  if (error) {
+    throw new Error(`Failed to set active shop: ${error.message}`);
+  }
+  revalidatePath('/', 'layout');
 }
 
 /**

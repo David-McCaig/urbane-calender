@@ -65,6 +65,9 @@ NEXT_PUBLIC_SUPABASE_URL=           # From Supabase dashboard > Settings > API
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=  # Supabase anon/public key
 SUPABASE_SERVICE_ROLE_KEY=          # Server-side only — bypasses RLS
 RESEND_API_KEY=                     # For sending invitation emails
+LIGHTSPEED_CLIENT_ID=               # Lightspeed OAuth app client ID
+LIGHTSPEED_CLIENT_SECRET=           # Lightspeed OAuth app client secret
+LIGHTSPEED_REDIRECT_URI=            # Lightspeed OAuth callback URL (e.g. http://localhost:3000/api/lightspeed/callback)
 ```
 
 `.env.local` is git-ignored. `.claude/settings.local.json` is also git-ignored (personal preferences).

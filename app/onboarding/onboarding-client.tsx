@@ -11,15 +11,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Store, Link2, LogOut } from 'lucide-react';
+import { LightspeedConnectForm } from './lightspeed-connect-form';
 
 interface OnboardingClientProps {
   userEmail?: string;
 }
 
 export function OnboardingClient({ userEmail }: OnboardingClientProps) {
-  const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
+  const [mode, setMode] = useState<'choose' | 'create' | 'join' | 'connect-lightspeed'>('choose');
   const [shopName, setShopName] = useState('');
   const [inviteToken, setInviteToken] = useState('');
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -35,8 +37,9 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
     setError(null);
 
     try {
-      await createShopAndMembership(shopName.trim());
-      router.push('/protected');
+      const shop = await createShopAndMembership(shopName.trim());
+      setSelectedShopId(shop.id);
+      setMode('connect-lightspeed');
     } catch (err: unknown) {
       setError(
         getErrorMessage(err, 'Failed to create shop')
@@ -181,6 +184,11 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
         </Card>
       </div>
     );
+  }
+
+  // Connect Lightspeed
+  if (mode === 'connect-lightspeed' && selectedShopId) {
+    return <LightspeedConnectForm shopId={selectedShopId} />;
   }
 
   // Join shop form
