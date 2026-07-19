@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/error-utils";
 import { createClient } from "@/lib/supabase/client";
 import { acceptInvitation } from "@/lib/actions/membership";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export function SignUpForm({
         router.push("/onboarding");
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(getErrorMessage(err, "An error occurred"));
     } finally {
       setIsLoading(false);
     }

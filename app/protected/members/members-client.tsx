@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getErrorMessage } from '@/lib/error-utils';
 import {
   updateMemberRole,
   removeMember,
@@ -104,7 +105,7 @@ export function MembersClient({
       router.refresh();
     } catch (err: unknown) {
       setInviteError(
-        err instanceof Error ? err.message : 'Failed to create invitation'
+        getErrorMessage(err, 'Failed to create invitation')
       );
     } finally {
       setInviteLoading(false);
@@ -127,7 +128,7 @@ export function MembersClient({
       router.refresh();
     } catch (err: unknown) {
       setRoleError(
-        err instanceof Error ? err.message : 'Failed to update role'
+        getErrorMessage(err, 'Failed to update role')
       );
     } finally {
       setUpdatingUser(null);
@@ -142,7 +143,7 @@ export function MembersClient({
       router.refresh();
     } catch (err: unknown) {
       alert(
-        err instanceof Error ? err.message : 'Failed to remove member'
+        getErrorMessage(err, 'Failed to remove member')
       );
     }
   };
@@ -153,7 +154,7 @@ export function MembersClient({
       router.refresh();
     } catch (err: unknown) {
       alert(
-        err instanceof Error ? err.message : 'Failed to cancel invitation'
+        getErrorMessage(err, 'Failed to cancel invitation')
       );
     }
   };

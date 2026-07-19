@@ -3,7 +3,12 @@
     "SessionStart": [
       {
         "matcher": "",
-        "command": "if [[ \"$PWD\" == *\".claude/worktrees/\"* ]]; then REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo \"\"); if [ -n \"$REPO_ROOT\" ] && [ -f \"$REPO_ROOT/.env.local\" ] && [ ! -e \".env.local\" ]; then ln -sf \"$REPO_ROOT/.env.local\" .env.local && echo '[hook] symlinked .env.local from repo root'; fi; fi"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$PWD\" == *\".claude/worktrees/\"* ]]; then REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo \"\"); if [ -n \"$REPO_ROOT\" ] && [ -f \"$REPO_ROOT/.env.local\" ] && [ ! -e \".env.local\" ]; then ln -sf \"$REPO_ROOT/.env.local\" .env.local && echo '[hook] symlinked .env.local from repo root'; fi; fi"
+          }
+        ]
       }
     ]
   }

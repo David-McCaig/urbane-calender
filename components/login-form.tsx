@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/error-utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,7 +50,7 @@ export function LoginForm({
         router.push("/protected");
       }
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      setError(getErrorMessage(error, "An error occurred"));
     } finally {
       setIsLoading(false);
     }

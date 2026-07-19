@@ -7,8 +7,11 @@ export default async function OnboardingPage() {
   let shopId: string | null;
   try {
     shopId = await resolveActiveShop();
-  } catch {
-    redirect('/auth/login');
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'Not authenticated') {
+      redirect('/auth/login');
+    }
+    throw err; // let network/Supabase errors reach the error.tsx boundary
   }
 
   if (shopId) {
