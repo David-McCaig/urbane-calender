@@ -31,6 +31,36 @@ export async function initiateLightspeedAuth(state: string) {
  * Checks if the current Lightspeed token is still valid
  * @returns Promise<boolean> - true if token is valid, false otherwise
  */
+/**
+ * Clears all Lightspeed cookies and redirects to the Lightspeed auth page.
+ * Used by the "Lightspeed Logout" button in the navbar.
+ */
+export async function logoutLightspeed() {
+  const cookieStore = await cookies();
+  cookieStore.set("lightspeed_token", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  cookieStore.set("lightspeed_account_id", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  cookieStore.set("lightspeed_oauth_state", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  redirect("/protected/lightspeed");
+}
+
 export async function isTokenValid(): Promise<boolean> {
   try {
     const cookieStore = await cookies();
