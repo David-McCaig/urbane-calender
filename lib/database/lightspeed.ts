@@ -1,41 +1,29 @@
-import axios from "axios";
-import { cookies } from "next/headers";
+import { getValidAccessToken } from "@/lib/lightspeed/api";
 
-export async function getAccountId(token: string) {
-    const lightSpeedApiUrl = process?.env?.LIGHTSPEED_API_URL;
+const LIGHTSPEED_API_URL = "https://api.lightspeedapp.com";
 
-    if (!token) {
-      throw new Error("No token found");
-    }
+/**
+ * Fetches account details from the Lightspeed API for the given shop.
+ * Uses the database-backed token store with automatic refresh.
+ */
+export async function getAccountDetails(shopId: string) {
+  const token = await getValidAccessToken(shopId);
 
-    // Fetch account ID if not cached
-    const response = await axios.get(`${lightSpeedApiUrl}/API/V3/Account.json`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const accountId = response?.data?.Account?.accountID;
-    // Store account ID in an HTTP-only cookie
-
-    return accountId;
+  if (!token) {
+    throw new Error("No Lightspeed integration found for this shop");
   }
 
-export async function getAccountDetails() {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("lightspeed_token")?.value;
+  const response = await fetch(`${LIGHTSPEED_API_URL}/API/V3/Account.json`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-    if (!token) {
-      throw new Error("No token found");
-    }
-
-    const lightSpeedApiUrl = process?.env?.LIGHTSPEED_API_URL;
-
-    const response = await axios.get(`${lightSpeedApiUrl}/API/V3/Account.json`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    return response?.data;
+  if (!response.ok) {
+    throw new Error(
+      `Lightspeed API error: ${response.status} ${await response.text()}`,
+    );
   }
+
+  return response.json();
+}
