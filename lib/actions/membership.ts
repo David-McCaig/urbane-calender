@@ -338,7 +338,7 @@ export async function createInvitation(
   }
 
   // Build the absolute invite URL
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000';
   const inviteUrl = `${baseUrl}/auth/accept-invitation?token=${token}`;
 
   // Send the invitation email via Resend

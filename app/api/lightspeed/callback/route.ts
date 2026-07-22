@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const accountId = searchParams.get('realm_id');
 
   const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000';
 
   // 1. Verify state parameter (CSRF protection)
   const storedState = request.cookies.get('lightspeed_oauth_state')?.value;
@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         client_secret: process.env.LIGHTSPEED_CLIENT_SECRET,
         code,
         grant_type: 'authorization_code',
+        redirect_uri: process.env.LIGHTSPEED_REDIRECT_URI,
       }),
     },
   );

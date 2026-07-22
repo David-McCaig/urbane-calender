@@ -54,7 +54,8 @@ export async function initiateLightspeedAuth(shopId?: string) {
 
   const clientId = process.env.LIGHTSPEED_CLIENT_ID;
 
-  const authUrl = `https://cloud.lightspeedapp.com/auth/oauth/authorize?response_type=code&client_id=${clientId}&scope=employee:register+employee:inventory+employee:workbench&state=${state}`;
+  const redirectUri = process.env.LIGHTSPEED_REDIRECT_URI!;
+  const authUrl = `https://cloud.lightspeedapp.com/auth/oauth/authorize?response_type=code&client_id=${clientId}&scope=employee:register+employee:inventory+employee:workbench&state=${state}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
   redirect(authUrl);
 }

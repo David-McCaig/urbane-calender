@@ -10,14 +10,14 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.redirect(
-      new URL('/auth/login', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+      new URL('/auth/login', process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000'),
     );
   }
 
   const shopId = user.user_metadata?.active_shop_id as string | undefined;
   if (!shopId) {
     return NextResponse.redirect(
-      new URL('/onboarding', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+      new URL('/onboarding', process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000'),
     );
   }
 
@@ -34,6 +34,10 @@ export async function GET() {
   );
   authorizeUrl.searchParams.set('scope', 'employee:all');
   authorizeUrl.searchParams.set('state', state);
+  authorizeUrl.searchParams.set(
+    'redirect_uri',
+    process.env.LIGHTSPEED_REDIRECT_URI!,
+  );
 
   const response = NextResponse.redirect(authorizeUrl);
   response.cookies.set('lightspeed_oauth_state', state, {
