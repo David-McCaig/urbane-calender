@@ -21,10 +21,6 @@ export default function AuthButton() {
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const state = generateState();
-        // Only access sessionStorage on client side
-        if (typeof window !== 'undefined') {
-            sessionStorage.setItem("state", state);
-        }
         await initiateLightspeedAuth(state);
     };
 

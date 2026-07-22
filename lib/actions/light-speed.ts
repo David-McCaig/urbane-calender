@@ -10,6 +10,18 @@ import { redirect } from "next/navigation";
 export async function initiateLightspeedAuth(state: string) {
   const clientId = process.env.LIGHTSPEED_CLIENT_ID;
 
+  // Store state in httpOnly cookie so callback can validate it against the
+  // state param returned by Lightspeed — prevents CSRF authorization code
+  // injection attacks.
+  const cookieStore = await cookies();
+  cookieStore.set("lightspeed_oauth_state", state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 600, // 10 minutes — user must complete OAuth within this window
+  });
+
   const authUrl = `https://cloud.lightspeedapp.com/auth/oauth/authorize?response_type=code&client_id=${clientId}&scope=employee:register+employee:inventory+employee:workbench&state=${state}`;
 
   redirect(authUrl);
@@ -19,6 +31,36 @@ export async function initiateLightspeedAuth(state: string) {
  * Checks if the current Lightspeed token is still valid
  * @returns Promise<boolean> - true if token is valid, false otherwise
  */
+/**
+ * Clears all Lightspeed cookies and redirects to the Lightspeed auth page.
+ * Used by the "Lightspeed Logout" button in the navbar.
+ */
+export async function logoutLightspeed() {
+  const cookieStore = await cookies();
+  cookieStore.set("lightspeed_token", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  cookieStore.set("lightspeed_account_id", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  cookieStore.set("lightspeed_oauth_state", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  redirect("/protected/lightspeed");
+}
+
 export async function isTokenValid(): Promise<boolean> {
   try {
     const cookieStore = await cookies();
