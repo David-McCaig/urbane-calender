@@ -37,6 +37,7 @@ export interface Shop {
   address: string | null;
   phone: string | null;
   email: string | null;
+  lightspeed_account_id: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -6,6 +6,9 @@
 -- 1. Clean up old seed data --------------------------------------------------
 -- Delete in reverse dependency order.
 
+DELETE FROM lightspeed_integrations
+WHERE shop_id = 'b0000000-0000-4000-8000-000000000001';
+
 DELETE FROM scheduled_jobs
 WHERE id IN (
   '950e8400-e29b-41d4-a716-446655440001',
@@ -116,6 +119,10 @@ INSERT INTO shops (id, name, address, phone, email) VALUES
   'test@test.com'
 )
 ON CONFLICT (id) DO NOTHING;
+
+-- Sync Lightspeed account ID for seed shop
+UPDATE shops SET lightspeed_account_id = 'seed_account_id'
+WHERE id = 'b0000000-0000-4000-8000-000000000001';
 
 -- 4. Mechanics (linked to auth users) ----------------------------------------
 
@@ -249,3 +256,16 @@ INSERT INTO jobs (id, shop_id, workorder_id, time_in, eta_out, customer_id, hook
   1
 )
 ON CONFLICT (id) DO NOTHING;
+
+-- 7. Lightspeed integration (placeholder) --------------------------------------
+
+INSERT INTO lightspeed_integrations (shop_id, integration_type, access_token, refresh_token, expires_at, account_id)
+VALUES (
+  'b0000000-0000-4000-8000-000000000001',
+  'lightspeed',
+  'seed_access_token_placeholder',
+  'seed_refresh_token_placeholder',
+  NOW() + INTERVAL '1 hour',
+  'seed_account_id'
+)
+ON CONFLICT (shop_id, integration_type) DO NOTHING;

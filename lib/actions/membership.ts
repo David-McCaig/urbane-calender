@@ -121,18 +121,25 @@ export async function createShopAndMembership(shopName: string): Promise<Shop> {
     console.error('Failed to auto-create mechanic record:', mechErr);
   }
 
-  // Set active shop in user_metadata so RLS picks it up on subsequent requests
-  const supabase = await createClient();
-  const { error: updateError } = await supabase.auth.updateUser({
-    data: { active_shop_id: shop.id },
-  });
-
-  if (updateError) {
-    throw new Error(`Failed to set active shop: ${updateError.message}`);
-  }
-
-  revalidatePath('/', 'layout');
   return shop;
+}
+
+/**
+ * Set the active shop without membership validation.
+ * Used during onboarding when the shop has just been created and the
+ * client needs to set active_shop_id before navigating to Lightspeed OAuth
+ * or the protected route. Does not validate membership — callers must
+ * ensure the user is a member of the shop.
+ */
+export async function setActiveShop(shopId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({
+    data: { active_shop_id: shopId },
+  });
+  if (error) {
+    throw new Error(`Failed to set active shop: ${error.message}`);
+  }
+  revalidatePath('/', 'layout');
 }
 
 /**
@@ -168,18 +175,20 @@ export async function switchActiveShop(shopId: string): Promise<void> {
 
 /**
  * Get the current user's role in their active shop.
+ * Accepts optional shopId to avoid JWT metadata propagation issues
+ * (updateUser cookie sets silently fail in Server Components).
  */
-export async function getCurrentUserRole(): Promise<MembershipRole | null> {
+export async function getCurrentUserRole(shopId?: string): Promise<MembershipRole | null> {
   try {
     const { supabase, user } = await getCurrentUser();
-    const shopId = user.user_metadata?.active_shop_id;
-    if (!shopId) return null;
+    const resolvedShopId = shopId || user.user_metadata?.active_shop_id;
+    if (!resolvedShopId) return null;
 
     const { data, error } = await supabase
       .from('user_shop_memberships')
       .select('role')
       .eq('user_id', user.id)
-      .eq('shop_id', shopId)
+      .eq('shop_id', resolvedShopId)
       .single();
 
     if (error || !data) return null;
@@ -329,7 +338,7 @@ export async function createInvitation(
   }
 
   // Build the absolute invite URL
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000';
   const inviteUrl = `${baseUrl}/auth/accept-invitation?token=${token}`;
 
   // Send the invitation email via Resend

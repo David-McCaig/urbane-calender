@@ -12,6 +12,7 @@ export function Navbar() {
   const links = [
     { href: '/protected', label: 'Calendar' },
     { href: '/protected/members', label: 'Members' },
+    { href: '/protected/settings', label: 'Settings' },
   ];
 
   return (

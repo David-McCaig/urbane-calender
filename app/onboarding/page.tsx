@@ -1,25 +1,23 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { resolveActiveShop } from '@/lib/actions/membership';
 import { OnboardingClient } from './onboarding-client';
 
 export default async function OnboardingPage() {
-  let shopId: string | null;
-  try {
-    shopId = await resolveActiveShop();
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message === 'Not authenticated') {
-      redirect('/auth/login');
-    }
-    throw err; // let network/Supabase errors reach the error.tsx boundary
-  }
-
-  if (shopId) {
-    redirect('/protected');
-  }
-
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/auth/login');
+  }
+
+  // Only check user_metadata.active_shop_id — do NOT use resolveActiveShop().
+  // resolveActiveShop() falls back to querying user_shop_memberships, which
+  // would find the membership created by createShopAndMembership and redirect
+  // to /protected before the Lightspeed connect step renders.
+  const activeShopId = user.user_metadata?.active_shop_id as string | undefined;
+  if (activeShopId) {
+    redirect('/protected');
+  }
 
   return <OnboardingClient userEmail={user?.email} />;
 }
