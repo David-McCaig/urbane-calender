@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 
 import { resolveActiveShop } from "@/lib/actions/membership";
 import { getAccountDetails } from "@/lib/database/lightspeed";
+import { getValidAccessToken } from "@/lib/lightspeed/api";
 import Calendar from "@/components/calender/Calendar";
 
 export default async function ProtectedPage() {
@@ -21,12 +21,11 @@ export default async function ProtectedPage() {
   }
 
   // Temp: verify Lightspeed OAuth flow works end-to-end
-  const cookieStore = await cookies();
-  const lightspeedToken = cookieStore.get("lightspeed_token")?.value;
+  const token = await getValidAccessToken(shopId);
 
-  if (lightspeedToken) {
+  if (token) {
     try {
-      const accountDetails = await getAccountDetails();
+      const accountDetails = await getAccountDetails(shopId);
       console.log("Lightspeed account details:", accountDetails);
     } catch (error) {
       console.error("Failed to fetch Lightspeed account details:", error);

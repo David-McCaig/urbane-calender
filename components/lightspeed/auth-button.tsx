@@ -6,9 +6,6 @@ import { useRouter } from "next/navigation";
 import {Button} from "@/components/ui/button"
 import { ClientOnly } from "@/components/lightspeed/client-only"
 
-//utils
-import { generateState } from "@/lib/utility/generateState";
-
 // Actions
 import { initiateLightspeedAuth } from "@/lib/actions/light-speed";
 
@@ -20,8 +17,7 @@ export default function AuthButton() {
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const state = generateState();
-        await initiateLightspeedAuth(state);
+        await initiateLightspeedAuth();
     };
 
     useEffect(() => {
