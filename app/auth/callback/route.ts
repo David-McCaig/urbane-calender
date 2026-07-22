@@ -50,7 +50,17 @@ export async function GET(request: NextRequest) {
     return errorResponse;
   }
 
-  const tokens = await tokenResponse.json();
+  let tokens: { access_token?: string; refresh_token?: string; expires_in?: number };
+  try {
+    tokens = await tokenResponse.json();
+  } catch {
+    console.error("[Lightspeed Callback] Failed to parse token response JSON");
+    const errorResponse = NextResponse.redirect(
+      new URL("/protected?error=lightspeed_token_parse_failed", baseUrl),
+    );
+    clearOAuthCookies(errorResponse);
+    return errorResponse;
+  }
 
   // 3. Get current user and resolve shop
   const supabase = await createClient();

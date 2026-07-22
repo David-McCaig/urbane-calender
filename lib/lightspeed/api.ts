@@ -31,13 +31,18 @@ export async function getValidAccessToken(
 
   if (
     expiresAt &&
-    expiresAt.getTime() - Date.now() < FIVE_MIN_MS &&
-    integration.refresh_token
+    integration.refresh_token &&
+    expiresAt.getTime() - Date.now() < FIVE_MIN_MS
   ) {
     return await refreshAccessToken(
       shopId,
       integration as LightspeedIntegration,
     );
+  }
+
+  // Token is expired and cannot be refreshed — treat as no valid token
+  if (expiresAt && expiresAt.getTime() <= Date.now() && !integration.refresh_token) {
+    return null;
   }
 
   return integration.access_token;
@@ -74,12 +79,19 @@ async function refreshAccessToken(
     Date.now() + (tokens.expires_in || 3600) * 1000,
   ).toISOString();
 
+  if (!tokens.refresh_token) {
+    console.warn(
+      '[Lightspeed] Refresh response missing refresh_token — reusing existing one.',
+    );
+  }
+  const newRefreshToken = tokens.refresh_token ?? integration.refresh_token;
+
   const supabase = await createClient();
   await supabase
     .from('lightspeed_integrations')
     .update({
       access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token ?? integration.refresh_token,
+      refresh_token: newRefreshToken,
       expires_at: expiresAt,
     })
     .eq('shop_id', shopId)
