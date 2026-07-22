@@ -1,9 +1,15 @@
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { resolveActiveShop } from '@/lib/actions/membership';
 import { OnboardingClient } from './onboarding-client';
 
 export default async function OnboardingPage() {
+  // Check if the user just created/joined a shop via onboarding —
+  // if so, don't redirect so they see the Lightspeed connection step
+  const cookieStore = await cookies();
+  const onboardingPending = cookieStore.get('onboarding_lightspeed_pending');
+
   let shopId: string | null;
   try {
     shopId = await resolveActiveShop();
@@ -14,7 +20,7 @@ export default async function OnboardingPage() {
     throw err; // let network/Supabase errors reach the error.tsx boundary
   }
 
-  if (shopId) {
+  if (shopId && !onboardingPending) {
     redirect('/protected');
   }
 
