@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getErrorMessage } from '@/lib/error-utils';
 import { createShopAndMembership } from '@/lib/actions/membership';
 import { acceptInvitation } from '@/lib/actions/membership';
+import { shopHasLightspeedIntegration } from '@/lib/actions/light-speed';
 import { createClient } from '@/lib/supabase/client';
+import AuthButton from '@/components/lightspeed/auth-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,9 +19,10 @@ interface OnboardingClientProps {
 }
 
 export function OnboardingClient({ userEmail }: OnboardingClientProps) {
-  const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
+  const [mode, setMode] = useState<'choose' | 'create' | 'join' | 'lightspeed'>('choose');
   const [shopName, setShopName] = useState('');
   const [inviteToken, setInviteToken] = useState('');
+  const [shopId, setShopId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -35,8 +38,9 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
     setError(null);
 
     try {
-      await createShopAndMembership(shopName.trim());
-      router.push('/protected');
+      const shop = await createShopAndMembership(shopName.trim());
+      setShopId(shop.id);
+      setMode('lightspeed');
     } catch (err: unknown) {
       setError(
         getErrorMessage(err, 'Failed to create shop')
@@ -64,8 +68,9 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
         token = urlObj.searchParams.get('token') || url;
       }
 
-      await acceptInvitation(token);
-      router.push('/protected');
+      const joinedShopId = await acceptInvitation(token);
+      setShopId(joinedShopId);
+      setMode('lightspeed');
     } catch (err: unknown) {
       setError(
         getErrorMessage(err, 'Failed to accept invitation')
@@ -79,6 +84,17 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
     await supabase.auth.signOut();
     router.push('/auth/login');
   };
+
+  // Auto-skip Lightspeed step if shop already connected
+  useEffect(() => {
+    if (mode === 'lightspeed' && shopId) {
+      shopHasLightspeedIntegration(shopId).then((hasIntegration) => {
+        if (hasIntegration) {
+          router.push('/protected');
+        }
+      });
+    }
+  }, [mode, shopId, router]);
 
   if (mode === 'choose') {
     return (
@@ -177,6 +193,42 @@ export function OnboardingClient({ userEmail }: OnboardingClientProps) {
                 Back
               </Button>
             </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Connect Lightspeed (after create/join)
+  if (mode === 'lightspeed') {
+    return (
+      <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle className="text-2xl">Connect to Lightspeed</CardTitle>
+            <CardDescription>
+              Link your Lightspeed account to import work orders and manage your service calendar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-4">
+              <AuthButton />
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white dark:bg-gray-950 px-2 text-gray-500">or</span>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => router.push('/protected')}
+              >
+                Skip for now
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

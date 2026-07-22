@@ -124,6 +124,18 @@ export async function logoutLightspeed() {
 }
 
 /**
+ * Checks if a shop has a Lightspeed integration row (regardless of token validity).
+ * Takes an explicit shopId to avoid JWT staleness after createShopAndMembership
+ * or acceptInvitation where the client-side JWT may not yet have active_shop_id.
+ */
+export async function shopHasLightspeedIntegration(
+  shopId: string,
+): Promise<boolean> {
+  const token = await getValidAccessToken(shopId);
+  return token !== null;
+}
+
+/**
  * Checks if the current shop has a valid Lightspeed access token.
  * Uses the database-backed token store with automatic refresh.
  */

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { randomBytes } from 'crypto';
 import { Resend } from 'resend';
 import type { MembershipRole, UserShopMembership, Invitation, Shop } from '@/lib/types/membership';
@@ -131,7 +132,16 @@ export async function createShopAndMembership(shopName: string): Promise<Shop> {
     throw new Error(`Failed to set active shop: ${updateError.message}`);
   }
 
-  revalidatePath('/', 'layout');
+  // Signal to the onboarding page that we're mid-flow — don't redirect
+  const cookieStore = await cookies();
+  cookieStore.set('onboarding_lightspeed_pending', shop.id, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 30,
+  });
+
   return shop;
 }
 
@@ -361,7 +371,7 @@ This invitation expires on ${expiresAt.toLocaleDateString()}.`,
  * Accept an invitation using its token. The current user must be authenticated
  * and their email must match the invitation.
  */
-export async function acceptInvitation(token: string): Promise<void> {
+export async function acceptInvitation(token: string): Promise<string> {
   const { user } = await getCurrentUser();
   const serviceClient = createServiceClient();
 
@@ -446,7 +456,17 @@ export async function acceptInvitation(token: string): Promise<void> {
     throw new Error(`Failed to set active shop: ${updateError.message}`);
   }
 
-  revalidatePath('/', 'layout');
+  // Signal to the onboarding page that we're mid-flow — don't redirect
+  const cookieStore = await cookies();
+  cookieStore.set('onboarding_lightspeed_pending', invitation.shop_id, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 30,
+  });
+
+  return invitation.shop_id;
 }
 
 /**

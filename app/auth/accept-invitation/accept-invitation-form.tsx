@@ -30,7 +30,6 @@ export function AcceptInvitationForm({
     try {
       await acceptInvitation(token);
       router.push('/protected');
-      router.refresh();
     } catch (err: unknown) {
       setError(
         getErrorMessage(err, 'Failed to accept invitation')
