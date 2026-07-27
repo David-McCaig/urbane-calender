@@ -16,6 +16,14 @@ export async function getValidAccessToken(
 ): Promise<string | null> {
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('Authentication required to access Lightspeed tokens');
+  }
+
   const { data: rows, error } = await supabase
     .rpc('get_decrypted_lightspeed_integration', { p_shop_id: shopId });
 

@@ -13,7 +13,7 @@ export function Navbar() {
   const links = [
     { href: '/protected', label: 'Calendar' },
     { href: '/protected/members', label: 'Members' },
-    { href: '/protected/lightspeed', label: 'Lightspeed' },
+    { href: '/protected/integrations', label: 'Integrations' },
   ];
 
   return (

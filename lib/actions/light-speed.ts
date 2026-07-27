@@ -120,7 +120,7 @@ export async function logoutLightspeed() {
     maxAge: 0,
   });
 
-  redirect("/protected/lightspeed");
+  redirect("/protected/integrations");
 }
 
 /**
