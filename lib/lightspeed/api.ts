@@ -16,14 +16,27 @@ export async function getValidAccessToken(
 ): Promise<string | null> {
   const supabase = await createClient();
 
-  const { data: integration, error } = await supabase
-    .from('lightspeed_integrations')
-    .select('*')
-    .eq('shop_id', shopId)
-    .eq('integration_type', 'lightspeed')
-    .single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (error || !integration) return null;
+  if (!user) {
+    throw new Error('Authentication required to access Lightspeed tokens');
+  }
+
+  const { data: rows, error } = await supabase
+    .rpc('get_decrypted_lightspeed_integration', { p_shop_id: shopId });
+
+  if (error) {
+    console.error('[getValidAccessToken] RPC error:', error);
+    return null;
+  }
+  if (!rows || rows.length === 0) {
+    console.log('[getValidAccessToken] No integration found for shop:', shopId);
+    return null;
+  }
+
+  const integration = rows[0] as LightspeedIntegration;
 
   const expiresAt = integration.expires_at
     ? new Date(integration.expires_at)
@@ -87,15 +100,13 @@ async function refreshAccessToken(
   const newRefreshToken = tokens.refresh_token ?? integration.refresh_token;
 
   const supabase = await createClient();
-  await supabase
-    .from('lightspeed_integrations')
-    .update({
-      access_token: tokens.access_token,
-      refresh_token: newRefreshToken,
-      expires_at: expiresAt,
-    })
-    .eq('shop_id', shopId)
-    .eq('integration_type', 'lightspeed');
+  await supabase.rpc('upsert_lightspeed_integration', {
+    p_shop_id: shopId,
+    p_access_token: tokens.access_token,
+    p_refresh_token: newRefreshToken,
+    p_expires_at: expiresAt,
+    p_account_id: integration.account_id,
+  });
 
   return tokens.access_token;
 }

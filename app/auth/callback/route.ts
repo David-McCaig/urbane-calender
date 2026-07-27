@@ -102,24 +102,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 5. Store tokens in DB (service client — bootstrap-like operation)
-  const serviceClient = createServiceClient();
+  // 5. Store tokens via SECURITY DEFINER function (encrypts in DB)
   const expiresIn = tokens.expires_in ?? 3600;
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  const { error: dbError } = await serviceClient
-    .from("lightspeed_integrations")
-    .upsert(
-      {
-        shop_id: shopId,
-        integration_type: "lightspeed",
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token ?? null,
-        expires_at: expiresAt,
-        account_id: accountId,
-      },
-      { onConflict: "shop_id, integration_type" },
-    );
+  const { error: dbError } = await supabase
+    .rpc('upsert_lightspeed_integration', {
+      p_shop_id: shopId,
+      p_access_token: tokens.access_token,
+      p_refresh_token: tokens.refresh_token ?? null,
+      p_expires_at: expiresAt,
+      p_account_id: accountId,
+    });
 
   if (dbError) {
     console.error("[Lightspeed Callback] DB upsert failed:", dbError);
@@ -130,8 +124,9 @@ export async function GET(request: NextRequest) {
     return errorResponse;
   }
 
-  // 6. Sync account ID to shops table
+  // 6. Sync account ID to shops table (needs service client — shops UPDATE is owner-only)
   if (accountId) {
+    const serviceClient = createServiceClient();
     const { error: shopUpdateError } = await serviceClient
       .from("shops")
       .update({ lightspeed_account_id: accountId })
