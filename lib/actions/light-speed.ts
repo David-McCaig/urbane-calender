@@ -160,8 +160,9 @@ export async function isTokenValid(): Promise<boolean> {
 }
 
 /**
- * Fetches Lightspeed work orders due on the given date (filtered by etaOut).
- * Returns an empty array on error or if no integration is configured.
+ * Fetches Lightspeed work orders due on the given date (filtered by etaOut
+ * using Lightspeed's native range query). Returns an empty array on error
+ * or if no integration is configured.
  */
 export async function getWorkOrdersByDate(
   shopId: string,
@@ -176,19 +177,29 @@ export async function getWorkOrdersByDate(
 
     const { token, accountId } = config;
 
-    // Build date range — etaOut on the given date (inclusive)
-    const startDate = `${date}T00:00:00+00:00`;
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
-    const nextDateStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
-    const endDate = `${nextDateStr}T00:00:00+00:00`;
+    // Build date range — etaOut on the given date using Lightspeed's
+    // between-operator query: ?etaOut=><,startISO,endISO
+    const dateObj = new Date(date);
+    const startDate = new Date(
+      dateObj.getFullYear(),
+      dateObj.getMonth(),
+      dateObj.getDate(),
+      0, 0, 0, 0,
+    );
+    const endDate = new Date(
+      dateObj.getFullYear(),
+      dateObj.getMonth(),
+      dateObj.getDate(),
+      23, 59, 59, 999,
+    );
+    const startISO = startDate.toISOString();
+    const endISO = endDate.toISOString();
 
-    const params = new URLSearchParams({
-      load_relations: '["Customer","Serialized","WorkorderStatus","Employee"]',
-      archived: 'false',
-    });
+    // Lightspeed between operator: %3E%3C = ><  ,  %2C = ,
+    const queryString =
+      `etaOut=%3E%3C%2C${encodeURIComponent(startISO)}%2C${encodeURIComponent(endISO)}`;
 
-    const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/Workorder.json?${params.toString()}`;
+    const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/Workorder.json?${queryString}`;
 
     const response = await fetch(url, {
       headers: {
@@ -207,19 +218,17 @@ export async function getWorkOrdersByDate(
     const json: LightspeedWorkOrderResponse = await response.json();
 
     // Lightspeed returns {} (empty object) when no work orders exist,
-    // and an array when they do. Normalize to an array.
-    const allWorkOrders = Array.isArray(json.Workorder)
-      ? json.Workorder
-      : [];
+    // a single object when one exists, and an array when multiple exist.
+    let allWorkOrders: LightspeedWorkOrder[];
+    if (!json.Workorder || (typeof json.Workorder === 'object' && !Array.isArray(json.Workorder) && Object.keys(json.Workorder).length === 0)) {
+      allWorkOrders = [];
+    } else if (!Array.isArray(json.Workorder)) {
+      allWorkOrders = [json.Workorder as unknown as LightspeedWorkOrder];
+    } else {
+      allWorkOrders = json.Workorder;
+    }
 
-    // Filter by etaOut date range client-side
-    const filtered = allWorkOrders.filter((wo) => {
-      if (!wo.etaOut) return false;
-      const etaOut = new Date(wo.etaOut);
-      return etaOut >= new Date(startDate) && etaOut < new Date(endDate);
-    });
-
-    return filtered;
+    return allWorkOrders;
   } catch (error) {
     console.error('[getWorkOrdersByDate] Unexpected error:', error);
     return [];
