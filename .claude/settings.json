@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [[ \"$PWD\" == *\".claude/worktrees/\"* ]]; then REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo \"\"); if [ -n \"$REPO_ROOT\" ] && [ -f \"$REPO_ROOT/.env.local\" ] && [ ! -e \".env.local\" ]; then ln -sf \"$REPO_ROOT/.env.local\" .env.local && echo '[hook] symlinked .env.local from repo root'; fi; fi"
+            "command": "if [[ \"$PWD\" == *\".claude/worktrees/\"* ]]; then REPO_ROOT=$(dirname \"$(git rev-parse --git-common-dir 2>/dev/null)\" 2>/dev/null || echo \"\"); if [ -n \"$REPO_ROOT\" ] && [ -f \"$REPO_ROOT/.env.local\" ] && [ ! -e \".env.local\" ]; then ln -sf \"$REPO_ROOT/.env.local\" .env.local && echo '[hook] symlinked .env.local from repo root'; fi; fi"
           }
         ]
       }

@@ -208,7 +208,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       const workorder = event.active.data.current?.workorder as LightspeedWorkOrder | undefined;
       if (workorder) {
         const itemDescription =
-          workorder.Serialized?.description || `WO #${workorder.workorderID}`;
+          workorder.hookIn || `WO #${workorder.workorderID}`;
         const customerName = workorder.Customer
           ? `${workorder.Customer.firstName} ${workorder.Customer.lastName}`
           : `Customer #${workorder.customerID}`;
@@ -296,7 +296,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
         ? `${workorder.Customer.firstName} ${workorder.Customer.lastName}`
         : `Customer #${workorder.customerID}`;
       const itemDescription =
-        workorder.Serialized?.description || `Work Order #${workorder.workorderID}`;
+        workorder.hookIn || `Work Order #${workorder.workorderID}`;
 
       try {
         // Try to create a local job — if it already exists (unique constraint),
