@@ -179,19 +179,11 @@ export async function getWorkOrdersByDate(
 
     // Build date range — etaOut on the given date using Lightspeed's
     // between-operator query: ?etaOut=><,startISO,endISO
-    const dateObj = new Date(date);
-    const startDate = new Date(
-      dateObj.getFullYear(),
-      dateObj.getMonth(),
-      dateObj.getDate(),
-      0, 0, 0, 0,
-    );
-    const endDate = new Date(
-      dateObj.getFullYear(),
-      dateObj.getMonth(),
-      dateObj.getDate(),
-      23, 59, 59, 999,
-    );
+    // Parse manually to avoid new Date("YYYY-MM-DD") which is UTC-parsed
+    // and shifts the date in non-UTC timezones.
+    const [year, month, day] = date.split('-').map(Number);
+    const startDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const endDate = new Date(year, month - 1, day, 23, 59, 59, 999);
     const startISO = startDate.toISOString();
     const endISO = endDate.toISOString();
 
