@@ -27,14 +27,6 @@ export function formatLocalDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-/** Estimate duration in hours from Lightspeed work order timeIn → etaOut. */
-function calculateDuration(wo: LightspeedWorkOrder): number {
-  const timeIn = new Date(wo.timeIn);
-  const etaOut = new Date(wo.etaOut);
-  const diffMs = etaOut.getTime() - timeIn.getTime();
-  return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60)));
-}
-
 /** Lightweight overlay data for the drag overlay. */
 interface DragOverlayData {
   title: string;
@@ -305,7 +297,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
             workorder_status_id: workorder.workorderStatusID,
             sale_id: workorder.saleID || "0",
             sale_line_id: workorder.saleLineID || "0",
-            duration: calculateDuration(workorder),
+            duration: 1,
           });
         } catch (err) {
           // Unique constraint violation — job already exists, find it
