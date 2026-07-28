@@ -61,6 +61,7 @@ export function JobsPanel({
 const CATEGORY_ORDER: string[] = [
   "Appointment",
   "Assessment",
+  "TODAY'S REPAIRS",
   "Open",
   "Assemble For Sale",
   "Test Request",
