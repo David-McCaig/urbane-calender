@@ -62,9 +62,6 @@ interface UseCalendarDataReturn {
   removeScheduledJob: (scheduledJobId: string) => Promise<void>;
 }
 
-/** Default work order status UUID — matches seed data. */
-const DEFAULT_WORKORDER_STATUS_ID = "550e8400-e29b-41d4-a716-446655440001";
-
 export function useCalendarData(activeShop: { id: string } | null): UseCalendarDataReturn {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
@@ -305,7 +302,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
             eta_out: workorder.etaOut,
             customer_id: customerName,
             hook_in: itemDescription,
-            workorder_status_id: workorder.workorderStatusID || DEFAULT_WORKORDER_STATUS_ID,
+            workorder_status_id: workorder.workorderStatusID,
             sale_id: workorder.saleID || "0",
             sale_line_id: workorder.saleLineID || "0",
             duration: calculateDuration(workorder),
