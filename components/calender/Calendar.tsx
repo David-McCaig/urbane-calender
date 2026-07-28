@@ -11,8 +11,7 @@ import { useActiveShop } from "@/lib/context/shop-context";
 import { useCalendarData } from "./use-calendar-data";
 import { CalendarGrid } from "./calendar-grid";
 import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
-import { WorkOrdersSidebar } from "./jobs-sidebar";
-import { JobsSidebarSkeleton } from "./jobs-sidebar-skeleton";
+import { JobsPanel } from "./JobsPanel";
 
 export default function Calendar() {
   const { activeShop, isLoading: shopLoading } = useActiveShop();
@@ -47,13 +46,12 @@ export default function Calendar() {
   // Loading state — shop context still resolving
   if (shopLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="h-[calc(100vh-3.5rem)] bg-gray-50 flex">
         <div className="w-[70%] flex-shrink-0">
           <main className="p-6">
             <CalendarGridSkeleton />
           </main>
         </div>
-        <JobsSidebarSkeleton />
       </div>
     );
   }
@@ -85,7 +83,7 @@ export default function Calendar() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="h-[calc(100vh-3.5rem)] bg-gray-50 flex">
         <CalendarGrid
           mechanics={mechanics}
           scheduledJobs={scheduledJobs}
@@ -104,7 +102,7 @@ export default function Calendar() {
           onRemoveScheduledJob={removeScheduledJob}
         />
 
-        <WorkOrdersSidebar
+        <JobsPanel
           workOrders={workOrders}
           workOrderStatusMap={workOrderStatusMap}
           loadingWorkOrders={loadingWorkOrders}
