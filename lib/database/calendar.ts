@@ -67,6 +67,41 @@ export async function getJobs(): Promise<Job[]> {
   return data || [];
 }
 
+/** Returns a single job by its Lightspeed workorder ID, or null if none exists. */
+export async function getJobByWorkorderId(workorderId: string): Promise<Job | null> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('workorder_id', workorderId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching job by workorder ID:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+/** Returns only the workorder IDs from the input list that already have local job records. */
+export async function getExistingWorkorderIds(
+  workorderIds: string[]
+): Promise<Set<string>> {
+  if (workorderIds.length === 0) return new Set();
+
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('workorder_id')
+    .in('workorder_id', workorderIds);
+
+  if (error) {
+    console.error('Error fetching existing workorder IDs:', error);
+    throw error;
+  }
+
+  return new Set((data || []).map((j) => j.workorder_id));
+}
+
 export async function createJob(jobData: Omit<Job, 'id' | 'created_at' | 'updated_at'>): Promise<Job> {
   const { data, error } = await supabase
     .from('jobs')

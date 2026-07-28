@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import {
-  getJobs,
+  getExistingWorkorderIds,
+  getJobByWorkorderId,
   createJob,
   getMechanics,
   getScheduledJobs,
@@ -59,7 +60,7 @@ interface UseCalendarDataReturn {
 }
 
 export function useCalendarData(activeShop: { id: string } | null): UseCalendarDataReturn {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [existingWorkorderIds, setExistingWorkorderIds] = useState<Set<string>>(new Set());
   const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
   const [mechanics, setMechanics] = useState<Mechanic[]>([]);
   const [allWorkOrders, setAllWorkOrders] = useState<LightspeedWorkOrder[]>([]);
@@ -80,9 +81,9 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   const allWorkOrdersRef = useRef(allWorkOrders);
   allWorkOrdersRef.current = allWorkOrders;
 
-  // Keep a ref to jobs for filtering work orders in fetch callbacks
-  const jobsRef = useRef(jobs);
-  jobsRef.current = jobs;
+  // Keep a ref to the current workorder IDs so the realtime subscription callback
+  // can re-check only the displayed IDs without resubscribing on every data change.
+  const workOrderIdsRef = useRef<string[]>([]);
 
   // Load grid data — mechanics, scheduled jobs, local jobs, statuses
   useEffect(() => {
@@ -100,10 +101,6 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       .then(setScheduledJobs)
       .catch(console.error);
 
-    getJobs()
-      .then(setJobs)
-      .catch(console.error);
-
     getWorkorderStatuses(activeShop.id)
       .then(setWorkOrderStatusMap)
       .catch(console.error);
@@ -117,15 +114,14 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
 
     setLoadingWorkOrders(true);
     getWorkOrdersByDate(activeShop.id, workOrdersDateStr)
-      .then((orders) => {
+      .then(async (orders) => {
         setAllWorkOrders(orders);
-        const localJobWorkorderIds = new Set(
-          jobsRef.current.map((j) => j.workorder_id)
-        );
+        const displayedIds = orders.map((wo) => String(wo.workorderID));
+        workOrderIdsRef.current = displayedIds;
+        const existingIds = await getExistingWorkorderIds(displayedIds);
+        setExistingWorkorderIds(existingIds);
         setWorkOrders(
-          orders.filter(
-            (wo) => !localJobWorkorderIds.has(String(wo.workorderID))
-          )
+          orders.filter((wo) => !existingIds.has(String(wo.workorderID)))
         );
       })
       .catch((err) => {
@@ -136,17 +132,14 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       .finally(() => setLoadingWorkOrders(false));
   }, [workOrdersDate, activeShop]);
 
-  // Keep workOrders in sync when jobs change (e.g., after scheduling/unscheduling)
+  // Keep workOrders in sync when existingWorkorderIds or allWorkOrders change
   useEffect(() => {
-    const localJobWorkorderIds = new Set(
-      jobs.map((j) => j.workorder_id)
-    );
     setWorkOrders(
       allWorkOrders.filter(
-        (wo) => !localJobWorkorderIds.has(String(wo.workorderID))
+        (wo) => !existingWorkorderIds.has(String(wo.workorderID))
       )
     );
-  }, [jobs, allWorkOrders]);
+  }, [existingWorkorderIds, allWorkOrders]);
 
   // Set up real-time subscriptions — scoped to the active shop
   useEffect(() => {
@@ -154,7 +147,9 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
 
     const jobsSubscription = subscribeToJobs(activeShop.id, (payload) => {
       console.log("Jobs changed:", payload);
-      getJobs().then(setJobs).catch(console.error);
+      getExistingWorkorderIds(workOrderIdsRef.current)
+        .then(setExistingWorkorderIds)
+        .catch(console.error);
     });
 
     const scheduledJobsSubscription = subscribeToScheduledJobs(activeShop.id, (payload) => {
@@ -225,15 +220,12 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       return;
     }
 
-    // Existing local job drag
-    const unscheduledJob = jobs.find((j) => j.id === dragId);
+    // Existing scheduled job drag
     const scheduledJob = scheduledJobs.find((j) => j.id === dragId);
-    const job = unscheduledJob || scheduledJob?.job || null;
-
-    if (job) {
+    if (scheduledJob?.job) {
       setActiveDragOverlay({
-        title: job.hook_in,
-        subtitle: `Customer ${job.customer_id} • ${job.duration}h`,
+        title: scheduledJob.job.hook_in,
+        subtitle: `Customer ${scheduledJob.job.customer_id} • ${scheduledJob.job.duration}h`,
       });
     }
   };
@@ -264,8 +256,12 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
         );
         if (isLightspeedOrigin) {
           await deleteJob(scheduledJob.job.id);
-          // Re-fetch local jobs so the filtering effect picks up the deletion
-          getJobs().then(setJobs).catch(console.error);
+          // Remove workorder_id from existing set so it reappears in the sidebar
+          setExistingWorkorderIds((prev) => {
+            const next = new Set(prev);
+            next.delete(scheduledJob.job.workorder_id);
+            return next;
+          });
         }
       } catch (error) {
         console.error("Error unscheduling job:", error);
@@ -317,10 +313,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
           });
         } catch (err) {
           // Unique constraint violation — job already exists, find it
-          const freshJobs = await getJobs();
-          const existing = freshJobs.find(
-            (j) => j.workorder_id === String(workorder.workorderID)
-          );
+          const existing = await getJobByWorkorderId(String(workorder.workorderID));
           if (!existing) throw err;
           jobRecord = existing;
         }
@@ -347,22 +340,24 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
           date: dateString,
         });
 
-        // Re-fetch to reconcile — realtime subscription will also fire
+        // Re-fetch scheduled jobs to reconcile — realtime subscription will also fire.
+        // Add workorder_id to existing set locally so the sidebar filters it out
+        // without needing a full jobs re-fetch.
         getScheduledJobs(dateString).then(setScheduledJobs).catch(console.error);
-        getJobs().then(setJobs).catch(console.error);
+        setExistingWorkorderIds((prev) =>
+          new Set(prev).add(String(workorder.workorderID))
+        );
       } catch (error) {
         console.error("Error scheduling Lightspeed work order:", error);
         getScheduledJobs(dateString).then(setScheduledJobs).catch(console.error);
-        getJobs().then(setJobs).catch(console.error);
         alert("Failed to schedule job. Please try again.");
       }
       return;
     }
 
-    // ---- Existing local job scheduling logic ----
-    const unscheduledJob = jobs.find((j) => j.id === dragId);
+    // ---- Move an existing scheduled job to a new slot ----
     const scheduledJob = scheduledJobs.find((j) => j.id === dragId);
-    const job = unscheduledJob || scheduledJob?.job;
+    const job = scheduledJob?.job;
 
     if (!job) return;
 
@@ -382,46 +377,22 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     }
 
     try {
-      if (unscheduledJob) {
-        // ---- Schedule an unscheduled job ----
-        const optimisticEntry: ScheduledJob = {
-          id: `optimistic-${job.id}`,
-          job_id: job.id,
-          shop_id: job.shop_id,
-          mechanic_id: mechanicsList[mechanicIndex].id,
-          time_slot: timeSlot,
-          date: dateString,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          job: job,
-          mechanic: mechanicsList[mechanicIndex],
-        };
-        setScheduledJobs((prev) => [...prev, optimisticEntry]);
-        await createScheduledJob({
-          job_id: job.id,
-          shop_id: job.shop_id,
-          mechanic_id: mechanicsList[mechanicIndex].id,
-          time_slot: timeSlot,
-          date: dateString,
-        });
-      } else if (scheduledJob) {
-        // ---- Move an existing scheduled job ----
-        setScheduledJobs((prev) =>
-          prev.map((sj) =>
-            sj.id === scheduledJob.id
-              ? { ...sj, mechanic_id: mechanicsList[mechanicIndex].id, time_slot: timeSlot }
-              : sj
-          )
-        );
-        await updateScheduledJob(scheduledJob.id, {
-          mechanic_id: mechanicsList[mechanicIndex].id,
-          time_slot: timeSlot,
-        });
-      }
+      // Optimistically move the scheduled job in local state
+      setScheduledJobs((prev) =>
+        prev.map((sj) =>
+          sj.id === scheduledJob.id
+            ? { ...sj, mechanic_id: mechanicsList[mechanicIndex].id, time_slot: timeSlot }
+            : sj
+        )
+      );
+      await updateScheduledJob(scheduledJob.id, {
+        mechanic_id: mechanicsList[mechanicIndex].id,
+        time_slot: timeSlot,
+      });
     } catch (error) {
-      console.error("Error scheduling job:", error);
+      console.error("Error moving scheduled job:", error);
       getScheduledJobs(dateString).then(setScheduledJobs).catch(console.error);
-      alert("Failed to schedule job. Please try again.");
+      alert("Failed to move scheduled job. Please try again.");
     }
   };
 
@@ -440,7 +411,12 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
         );
         if (isLightspeedOrigin) {
           await deleteJob(scheduledJob.job.id);
-          getJobs().then(setJobs).catch(console.error);
+          // Remove workorder_id from existing set so it reappears in the sidebar
+          setExistingWorkorderIds((prev) => {
+            const next = new Set(prev);
+            next.delete(scheduledJob.job.workorder_id);
+            return next;
+          });
         }
       }
     } catch (error) {
