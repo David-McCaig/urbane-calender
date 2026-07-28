@@ -46,6 +46,7 @@ export interface LightspeedWorkOrder {
   etaOut: string;
   note: string;
   internalNote?: string;
+  hookIn?: string;
   warranty: string;
   archived: string;
   customerID: string;

@@ -24,7 +24,7 @@ export function DraggableWorkOrder({
     : undefined;
 
   const itemDescription =
-    workorder.Serialized?.description || "No item description";
+    workorder.hookIn || "No item description";
   const customerName = workorder.Customer
     ? `${workorder.Customer.firstName} ${workorder.Customer.lastName}`
     : `Customer #${workorder.customerID}`;
