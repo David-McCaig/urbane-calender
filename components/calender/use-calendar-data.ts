@@ -41,11 +41,15 @@ interface UseCalendarDataReturn {
   workOrderStatusMap: WorkOrderStatusMap;
   loadingGrid: boolean;
   loadingWorkOrders: boolean;
-  // Date
+  // Date (grid)
   currentDate: Date;
   setCurrentDate: (date: Date) => void;
   navigateDate: (direction: "prev" | "next") => void;
   goToToday: () => void;
+  // Date (work orders sidebar — independent from grid)
+  workOrdersDate: Date;
+  setWorkOrdersDate: (date: Date) => void;
+  navigateWorkOrdersDate: (direction: "prev" | "next") => void;
   // Drag and drop
   activeDragOverlay: DragOverlayData | null;
   handleDragStart: (event: DragStartEvent) => void;
@@ -64,6 +68,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   const [loadingWorkOrders, setLoadingWorkOrders] = useState(true);
   const [workOrderStatusMap, setWorkOrderStatusMap] = useState<WorkOrderStatusMap>({});
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [workOrdersDate, setWorkOrdersDate] = useState(new Date());
   const [activeDragOverlay, setActiveDragOverlay] = useState<DragOverlayData | null>(null);
 
   // Keep a ref to currentDate so the realtime callbacks always read the latest date
@@ -79,40 +84,41 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
 
-  // Load initial data — independent queries so grid renders before sidebar
+  // Load grid data — mechanics, scheduled jobs, local jobs, statuses
   useEffect(() => {
     if (!activeShop) return;
 
     const dateStr = formatLocalDate(currentDate);
 
-    // Mechanics → unblocks the grid
     setLoadingGrid(true);
     getMechanics()
       .then(setMechanics)
       .catch(console.error)
       .finally(() => setLoadingGrid(false));
 
-    // Scheduled jobs → overlays on the grid (doesn't block grid render)
     getScheduledJobs(dateStr)
       .then(setScheduledJobs)
       .catch(console.error);
 
-    // Local jobs → used for filtering + drag conflict checks
     getJobs()
       .then(setJobs)
       .catch(console.error);
 
-    // Work order statuses → lookup map (changes rarely, fetch once per shop)
     getWorkorderStatuses(activeShop.id)
       .then(setWorkOrderStatusMap)
       .catch(console.error);
+  }, [currentDate, activeShop]);
 
-    // Lightspeed work orders → sidebar
+  // Load Lightspeed work orders — independent from grid date
+  useEffect(() => {
+    if (!activeShop) return;
+
+    const workOrdersDateStr = formatLocalDate(workOrdersDate);
+
     setLoadingWorkOrders(true);
-    getWorkOrdersByDate(activeShop.id, dateStr)
+    getWorkOrdersByDate(activeShop.id, workOrdersDateStr)
       .then((orders) => {
         setAllWorkOrders(orders);
-        // Filter out already-scheduled work orders using latest jobs from ref
         const localJobWorkorderIds = new Set(
           jobsRef.current.map((j) => j.workorder_id)
         );
@@ -128,7 +134,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
         setWorkOrders([]);
       })
       .finally(() => setLoadingWorkOrders(false));
-  }, [currentDate, activeShop]);
+  }, [workOrdersDate, activeShop]);
 
   // Keep workOrders in sync when jobs change (e.g., after scheduling/unscheduling)
   useEffect(() => {
@@ -182,6 +188,16 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
 
   const goToToday = () => {
     setCurrentDate(new Date());
+  };
+
+  const navigateWorkOrdersDate = (direction: "prev" | "next") => {
+    const newDate = new Date(workOrdersDate);
+    if (direction === "prev") {
+      newDate.setDate(newDate.getDate() - 1);
+    } else {
+      newDate.setDate(newDate.getDate() + 1);
+    }
+    setWorkOrdersDate(newDate);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -445,6 +461,9 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     setCurrentDate,
     navigateDate,
     goToToday,
+    workOrdersDate,
+    setWorkOrdersDate,
+    navigateWorkOrdersDate,
     activeDragOverlay,
     handleDragStart,
     handleDragEnd,

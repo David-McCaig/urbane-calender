@@ -28,6 +28,9 @@ export default function Calendar() {
     setCurrentDate,
     navigateDate,
     goToToday,
+    workOrdersDate,
+    setWorkOrdersDate,
+    navigateWorkOrdersDate,
     activeDragOverlay,
     handleDragStart,
     handleDragEnd,
@@ -105,10 +108,10 @@ export default function Calendar() {
           workOrders={workOrders}
           workOrderStatusMap={workOrderStatusMap}
           loadingWorkOrders={loadingWorkOrders}
-          currentDate={currentDate}
-          onNavigateDate={navigateDate}
-          onGoToToday={goToToday}
-          onDateSelect={setCurrentDate}
+          currentDate={workOrdersDate}
+          onNavigateDate={navigateWorkOrdersDate}
+          onGoToToday={() => setWorkOrdersDate(new Date())}
+          onDateSelect={setWorkOrdersDate}
         />
 
         <DragOverlay>
