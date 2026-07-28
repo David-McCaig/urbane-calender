@@ -11,9 +11,8 @@ import { useActiveShop } from "@/lib/context/shop-context";
 import { useCalendarData } from "./use-calendar-data";
 import { CalendarGrid } from "./calendar-grid";
 import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
-import { JobsSidebar } from "./jobs-sidebar";
+import { WorkOrdersSidebar } from "./jobs-sidebar";
 import { JobsSidebarSkeleton } from "./jobs-sidebar-skeleton";
-import { JobEntryForm } from "./job-entry-form";
 
 export default function Calendar() {
   const { activeShop, isLoading: shopLoading } = useActiveShop();
@@ -21,22 +20,20 @@ export default function Calendar() {
   const {
     mechanics,
     scheduledJobs,
-    jobs,
+    workOrders,
     loadingGrid,
-    loadingJobs,
+    loadingWorkOrders,
     currentDate,
     setCurrentDate,
     navigateDate,
     goToToday,
-    activeJob,
+    activeDragOverlay,
     handleDragStart,
     handleDragEnd,
-    addJob,
     removeScheduledJob,
   } = useCalendarData(activeShop);
 
   // UI-only local state
-  const [showJobForm, setShowJobForm] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Refs for scroll syncing
@@ -103,31 +100,23 @@ export default function Calendar() {
           onRemoveScheduledJob={removeScheduledJob}
         />
 
-        <JobsSidebar
-          jobs={jobs}
-          loadingJobs={loadingJobs}
-          onShowJobForm={() => setShowJobForm(true)}
+        <WorkOrdersSidebar
+          workOrders={workOrders}
+          loadingWorkOrders={loadingWorkOrders}
+          currentDate={currentDate}
+          onNavigateDate={navigateDate}
+          onGoToToday={goToToday}
+          onDateSelect={setCurrentDate}
         />
 
-        {/* Job Form Modal */}
-        {showJobForm && (
-          <JobEntryForm
-            onSubmit={async (data) => {
-              await addJob(data);
-              setShowJobForm(false);
-            }}
-            onClose={() => setShowJobForm(false)}
-          />
-        )}
-
         <DragOverlay>
-          {activeJob ? (
+          {activeDragOverlay ? (
             <div className="p-3 bg-blue-100 border-2 border-blue-300 rounded-lg shadow-lg">
               <div className="font-medium text-sm text-blue-900">
-                {activeJob.hook_in}
+                {activeDragOverlay.title}
               </div>
               <div className="text-xs text-blue-700">
-                Customer {activeJob.customer_id} • {activeJob.duration}h
+                {activeDragOverlay.subtitle}
               </div>
             </div>
           ) : null}

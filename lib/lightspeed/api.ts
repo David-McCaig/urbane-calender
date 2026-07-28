@@ -7,13 +7,13 @@ const LIGHTSPEED_TOKEN_URL =
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
 /**
- * Returns a valid Lightspeed access token for the given shop.
- * Refreshes transparently if the stored token is expired or will expire
- * within 5 minutes. Returns null if the shop has no Lightspeed integration.
+ * Shared helper — returns the full decrypted Lightspeed integration row
+ * for the given shop, or null if none exists. Token refresh is handled
+ * transparently when the access token is expired or near-expired.
  */
-export async function getValidAccessToken(
+async function _getIntegration(
   shopId: string,
-): Promise<string | null> {
+): Promise<LightspeedIntegration | null> {
   const supabase = await createClient();
 
   const {
@@ -28,47 +28,71 @@ export async function getValidAccessToken(
     .rpc('get_decrypted_lightspeed_integration', { p_shop_id: shopId });
 
   if (error) {
-    console.error('[getValidAccessToken] RPC error:', error);
+    console.error('[_getIntegration] RPC error:', error);
     return null;
   }
   if (!rows || rows.length === 0) {
-    console.log('[getValidAccessToken] No integration found for shop:', shopId);
     return null;
   }
 
   const integration = rows[0] as LightspeedIntegration;
-
   const expiresAt = integration.expires_at
     ? new Date(integration.expires_at)
     : null;
 
+  // Refresh if expired or expiring within 5 minutes and a refresh token exists
   if (
     expiresAt &&
     integration.refresh_token &&
     expiresAt.getTime() - Date.now() < FIVE_MIN_MS
   ) {
-    return await refreshAccessToken(
-      shopId,
-      integration as LightspeedIntegration,
-    );
+    return await _refreshAccessToken(shopId, integration);
   }
 
-  // Token is expired and cannot be refreshed — treat as no valid token
+  // Token is expired and cannot be refreshed
   if (expiresAt && expiresAt.getTime() <= Date.now() && !integration.refresh_token) {
     return null;
   }
 
-  return integration.access_token;
+  return integration;
+}
+
+/**
+ * Returns a valid Lightspeed access token for the given shop.
+ * Refreshes transparently if the stored token is expired or will expire
+ * within 5 minutes. Returns null if the shop has no Lightspeed integration.
+ */
+export async function getValidAccessToken(
+  shopId: string,
+): Promise<string | null> {
+  const integration = await _getIntegration(shopId);
+  return integration?.access_token ?? null;
+}
+
+/**
+ * Returns both access token and account ID needed for Lightspeed API calls.
+ * Refreshes transparently like getValidAccessToken.
+ * Returns null if the shop has no Lightspeed integration.
+ */
+export async function getLightspeedApiConfig(
+  shopId: string,
+): Promise<{ token: string; accountId: string } | null> {
+  const integration = await _getIntegration(shopId);
+  if (!integration || !integration.account_id) return null;
+  return {
+    token: integration.access_token,
+    accountId: integration.account_id,
+  };
 }
 
 /**
  * Refresh an expired or near-expired Lightspeed access token using the
- * refresh_token grant. Updates the stored row and returns the new access token.
+ * refresh_token grant. Updates the stored row and returns the new integration.
  */
-async function refreshAccessToken(
+async function _refreshAccessToken(
   shopId: string,
   integration: LightspeedIntegration,
-): Promise<string> {
+): Promise<LightspeedIntegration> {
   const response = await fetch(LIGHTSPEED_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -108,5 +132,10 @@ async function refreshAccessToken(
     p_account_id: integration.account_id,
   });
 
-  return tokens.access_token;
+  return {
+    ...integration,
+    access_token: tokens.access_token,
+    refresh_token: newRefreshToken,
+    expires_at: expiresAt,
+  };
 }

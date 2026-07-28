@@ -10,3 +10,65 @@ export interface LightspeedIntegration {
   created_at: string;
   updated_at: string;
 }
+
+/** Customer relation on a Lightspeed work order. */
+export interface LightspeedCustomer {
+  customerID: string;
+  firstName: string;
+  lastName: string;
+  company?: string;
+}
+
+/** Serialized (item being repaired) relation on a Lightspeed work order. */
+export interface LightspeedSerialized {
+  serializedID: string;
+  description: string;
+  unitPrice?: string;
+}
+
+/** Work order status relation on a Lightspeed work order. */
+export interface LightspeedWorkOrderStatus {
+  workorderStatusID: string;
+  name: string;
+}
+
+/** Employee relation on a Lightspeed work order. */
+export interface LightspeedEmployee {
+  employeeID: string;
+  firstName: string;
+  lastName: string;
+}
+
+/** A Lightspeed work order (service/repair ticket). */
+export interface LightspeedWorkOrder {
+  workorderID: string;
+  timeIn: string;
+  etaOut: string;
+  note: string;
+  internalNote?: string;
+  warranty: string;
+  archived: string;
+  customerID: string;
+  discountID?: string;
+  employeeID: string;
+  serializedID: string;
+  shopID: string;
+  saleID?: string;
+  saleLineID?: string;
+  workorderStatusID: string;
+  timeStamp?: string;
+  Customer?: LightspeedCustomer;
+  Serialized?: LightspeedSerialized;
+  WorkorderStatus?: LightspeedWorkOrderStatus;
+  Employee?: LightspeedEmployee;
+}
+
+/** Response envelope for GET /API/V3/Account/{id}/Workorder.json */
+export interface LightspeedWorkOrderResponse {
+  '@attributes'?: {
+    next?: string;
+    previous?: string;
+    count?: string;
+  };
+  Workorder: LightspeedWorkOrder[] | Record<string, never>;
+}

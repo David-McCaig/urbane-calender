@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getValidAccessToken } from "@/lib/lightspeed/api";
+import { getValidAccessToken, getLightspeedApiConfig } from "@/lib/lightspeed/api";
+import type { LightspeedWorkOrder, LightspeedWorkOrderResponse } from "@/lib/lightspeed/types";
 
 /**
  * Initiates the OAuth flow with Lightspeed. Generates CSRF state server-side,
@@ -155,5 +156,72 @@ export async function isTokenValid(): Promise<boolean> {
     return token !== null;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Fetches Lightspeed work orders due on the given date (filtered by etaOut).
+ * Returns an empty array on error or if no integration is configured.
+ */
+export async function getWorkOrdersByDate(
+  shopId: string,
+  date: string, // "YYYY-MM-DD"
+): Promise<LightspeedWorkOrder[]> {
+  try {
+    const config = await getLightspeedApiConfig(shopId);
+    if (!config) {
+      console.log('[getWorkOrdersByDate] No Lightspeed integration for shop:', shopId);
+      return [];
+    }
+
+    const { token, accountId } = config;
+
+    // Build date range — etaOut on the given date (inclusive)
+    const startDate = `${date}T00:00:00+00:00`;
+    const nextDay = new Date(date);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const nextDateStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
+    const endDate = `${nextDateStr}T00:00:00+00:00`;
+
+    const params = new URLSearchParams({
+      load_relations: '["Customer","Serialized","WorkorderStatus","Employee"]',
+      archived: 'false',
+    });
+
+    const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/Workorder.json?${params.toString()}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        `[getWorkOrdersByDate] Lightspeed API error: ${response.status}`,
+      );
+      return [];
+    }
+
+    const json: LightspeedWorkOrderResponse = await response.json();
+
+    // Lightspeed returns {} (empty object) when no work orders exist,
+    // and an array when they do. Normalize to an array.
+    const allWorkOrders = Array.isArray(json.Workorder)
+      ? json.Workorder
+      : [];
+
+    // Filter by etaOut date range client-side
+    const filtered = allWorkOrders.filter((wo) => {
+      if (!wo.etaOut) return false;
+      const etaOut = new Date(wo.etaOut);
+      return etaOut >= new Date(startDate) && etaOut < new Date(endDate);
+    });
+
+    return filtered;
+  } catch (error) {
+    console.error('[getWorkOrdersByDate] Unexpected error:', error);
+    return [];
   }
 }
