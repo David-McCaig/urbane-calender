@@ -189,7 +189,8 @@ export async function getWorkOrdersByDate(
 
     // Lightspeed between operator: %3E%3C = ><  ,  %2C = ,
     const queryString =
-      `etaOut=%3E%3C%2C${encodeURIComponent(startISO)}%2C${encodeURIComponent(endISO)}`;
+      `etaOut=%3E%3C%2C${encodeURIComponent(startISO)}%2C${encodeURIComponent(endISO)}` +
+      `&load_relations=${encodeURIComponent('["Customer"]')}`;
 
     const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/Workorder.json?${queryString}`;
 
