@@ -72,3 +72,14 @@ export interface LightspeedWorkOrderResponse {
   };
   Workorder: LightspeedWorkOrder[] | Record<string, never>;
 }
+
+/** Response envelope for GET /API/V3/Account/{id}/WorkorderStatus.json */
+export interface LightspeedWorkOrderStatusResponse {
+  '@attributes'?: {
+    count?: string;
+  };
+  WorkorderStatus: LightspeedWorkOrderStatus[];
+}
+
+/** Lookup map: workorderStatusID → status name */
+export type WorkOrderStatusMap = Record<string, string>;

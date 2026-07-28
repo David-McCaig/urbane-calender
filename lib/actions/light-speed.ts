@@ -6,7 +6,7 @@ import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getValidAccessToken, getLightspeedApiConfig } from "@/lib/lightspeed/api";
-import type { LightspeedWorkOrder, LightspeedWorkOrderResponse } from "@/lib/lightspeed/types";
+import type { LightspeedWorkOrder, LightspeedWorkOrderResponse, LightspeedWorkOrderStatusResponse, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 /**
  * Initiates the OAuth flow with Lightspeed. Generates CSRF state server-side,
@@ -224,5 +224,47 @@ export async function getWorkOrdersByDate(
   } catch (error) {
     console.error('[getWorkOrdersByDate] Unexpected error:', error);
     return [];
+  }
+}
+
+/**
+ * Fetches all work order statuses and returns a lookup map
+ * (workorderStatusID → name). Cached per request — statuses change rarely.
+ */
+export async function getWorkorderStatuses(
+  shopId: string,
+): Promise<WorkOrderStatusMap> {
+  try {
+    const config = await getLightspeedApiConfig(shopId);
+    if (!config) return {};
+
+    const { token, accountId } = config;
+    const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/WorkorderStatus.json`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        `[getWorkorderStatuses] Lightspeed API error: ${response.status}`,
+      );
+      return {};
+    }
+
+    const json: LightspeedWorkOrderStatusResponse = await response.json();
+    const statuses = json.WorkorderStatus || [];
+
+    const map: WorkOrderStatusMap = {};
+    for (const status of statuses) {
+      map[status.workorderStatusID] = status.name;
+    }
+    return map;
+  } catch (error) {
+    console.error('[getWorkorderStatuses] Unexpected error:', error);
+    return {};
   }
 }

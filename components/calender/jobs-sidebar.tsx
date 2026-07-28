@@ -7,10 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import DropZone from "./drop-zone";
 import { DraggableWorkOrder } from "./draggable-work-order";
 import { DatePicker } from "./date-picker";
-import type { LightspeedWorkOrder } from "@/lib/lightspeed/types";
+import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 interface WorkOrdersSidebarProps {
   workOrders: LightspeedWorkOrder[];
+  workOrderStatusMap: WorkOrderStatusMap;
   loadingWorkOrders: boolean;
   currentDate: Date;
   onNavigateDate: (direction: "prev" | "next") => void;
@@ -29,6 +30,7 @@ function formatDate(date: Date): string {
 
 export function WorkOrdersSidebar({
   workOrders,
+  workOrderStatusMap,
   loadingWorkOrders,
   currentDate,
   onNavigateDate,
@@ -125,7 +127,7 @@ export function WorkOrdersSidebar({
         ) : (
           <div className="space-y-2">
             {workOrders.map((wo) => (
-              <DraggableWorkOrder key={wo.workorderID} workorder={wo} />
+              <DraggableWorkOrder key={wo.workorderID} workorder={wo} statusMap={workOrderStatusMap} />
             ))}
           </div>
         )}

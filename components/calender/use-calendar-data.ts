@@ -19,8 +19,8 @@ import {
   type Mechanic,
   type ScheduledJob,
 } from "@/lib/database/calendar";
-import { getWorkOrdersByDate } from "@/lib/actions/light-speed";
-import type { LightspeedWorkOrder } from "@/lib/lightspeed/types";
+import { getWorkOrdersByDate, getWorkorderStatuses } from "@/lib/actions/light-speed";
+import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 /** Format a Date as YYYY-MM-DD in the local timezone — avoids the UTC shift of toISOString(). */
 export function formatLocalDate(date: Date): string {
@@ -46,6 +46,7 @@ interface UseCalendarDataReturn {
   mechanics: Mechanic[];
   scheduledJobs: ScheduledJob[];
   workOrders: LightspeedWorkOrder[];
+  workOrderStatusMap: WorkOrderStatusMap;
   loadingGrid: boolean;
   loadingWorkOrders: boolean;
   // Date
@@ -72,6 +73,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   const [workOrders, setWorkOrders] = useState<LightspeedWorkOrder[]>([]);
   const [loadingGrid, setLoadingGrid] = useState(true);
   const [loadingWorkOrders, setLoadingWorkOrders] = useState(true);
+  const [workOrderStatusMap, setWorkOrderStatusMap] = useState<WorkOrderStatusMap>({});
   const [currentDate, setCurrentDate] = useState(new Date());
   const [activeDragOverlay, setActiveDragOverlay] = useState<DragOverlayData | null>(null);
 
@@ -109,6 +111,11 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     // Local jobs → used for filtering + drag conflict checks
     getJobs()
       .then(setJobs)
+      .catch(console.error);
+
+    // Work order statuses → lookup map (changes rarely, fetch once per shop)
+    getWorkorderStatuses(activeShop.id)
+      .then(setWorkOrderStatusMap)
       .catch(console.error);
 
     // Lightspeed work orders → sidebar
@@ -442,6 +449,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     mechanics,
     scheduledJobs,
     workOrders,
+    workOrderStatusMap,
     loadingGrid,
     loadingWorkOrders,
     currentDate,

@@ -2,12 +2,14 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { Badge } from "@/components/ui/badge";
-import type { LightspeedWorkOrder } from "@/lib/lightspeed/types";
+import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 export function DraggableWorkOrder({
   workorder,
+  statusMap,
 }: {
   workorder: LightspeedWorkOrder;
+  statusMap: WorkOrderStatusMap;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -26,7 +28,8 @@ export function DraggableWorkOrder({
   const customerName = workorder.Customer
     ? `${workorder.Customer.firstName} ${workorder.Customer.lastName}`
     : `Customer #${workorder.customerID}`;
-  const statusName = workorder.WorkorderStatus?.name || "Unknown";
+  const statusName =
+    statusMap[workorder.workorderStatusID] || "Unknown";
   const etaTime = new Date(workorder.etaOut).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -49,11 +52,11 @@ export function DraggableWorkOrder({
           </div>
           <div className="text-xs text-gray-500 truncate">{customerName}</div>
           <div className="text-xs text-gray-400 mt-0.5">
-            {statusName} &middot; ETA {etaTime}
+            ETA {etaTime}
           </div>
         </div>
         <Badge variant="secondary" className="text-xs flex-shrink-0 ml-2">
-          WO-{workorder.workorderID}
+          {statusName}
         </Badge>
       </div>
     </div>

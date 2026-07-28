@@ -21,6 +21,7 @@ export default function Calendar() {
     mechanics,
     scheduledJobs,
     workOrders,
+    workOrderStatusMap,
     loadingGrid,
     loadingWorkOrders,
     currentDate,
@@ -102,6 +103,7 @@ export default function Calendar() {
 
         <WorkOrdersSidebar
           workOrders={workOrders}
+          workOrderStatusMap={workOrderStatusMap}
           loadingWorkOrders={loadingWorkOrders}
           currentDate={currentDate}
           onNavigateDate={navigateDate}
