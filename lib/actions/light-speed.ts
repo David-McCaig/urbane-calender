@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getValidAccessToken } from "@/lib/lightspeed/api";
+import { getValidAccessToken, getLightspeedApiConfig } from "@/lib/lightspeed/api";
+import type { LightspeedWorkOrder, LightspeedWorkOrderResponse, LightspeedWorkOrderStatusResponse, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 /**
  * Initiates the OAuth flow with Lightspeed. Generates CSRF state server-side,
@@ -155,5 +156,115 @@ export async function isTokenValid(): Promise<boolean> {
     return token !== null;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Fetches Lightspeed work orders due on the given date (filtered by etaOut
+ * using Lightspeed's native range query). Returns an empty array on error
+ * or if no integration is configured.
+ */
+export async function getWorkOrdersByDate(
+  shopId: string,
+  date: string, // "YYYY-MM-DD"
+): Promise<LightspeedWorkOrder[]> {
+  try {
+    const config = await getLightspeedApiConfig(shopId);
+    if (!config) {
+      console.log('[getWorkOrdersByDate] No Lightspeed integration for shop:', shopId);
+      return [];
+    }
+
+    const { token, accountId } = config;
+
+    // Build date range — etaOut on the given date using Lightspeed's
+    // between-operator query: ?etaOut=><,startISO,endISO
+    // Parse manually to avoid new Date("YYYY-MM-DD") which is UTC-parsed
+    // and shifts the date in non-UTC timezones.
+    const [year, month, day] = date.split('-').map(Number);
+    const startDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const endDate = new Date(year, month - 1, day, 23, 59, 59, 999);
+    const startISO = startDate.toISOString();
+    const endISO = endDate.toISOString();
+
+    // Lightspeed between operator: %3E%3C = ><  ,  %2C = ,
+    const queryString =
+      `etaOut=%3E%3C%2C${encodeURIComponent(startISO)}%2C${encodeURIComponent(endISO)}`;
+
+    const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/Workorder.json?${queryString}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        `[getWorkOrdersByDate] Lightspeed API error: ${response.status}`,
+      );
+      return [];
+    }
+
+    const json: LightspeedWorkOrderResponse = await response.json();
+
+    // Lightspeed returns {} (empty object) when no work orders exist,
+    // a single object when one exists, and an array when multiple exist.
+    let allWorkOrders: LightspeedWorkOrder[];
+    if (!json.Workorder || (typeof json.Workorder === 'object' && !Array.isArray(json.Workorder) && Object.keys(json.Workorder).length === 0)) {
+      allWorkOrders = [];
+    } else if (!Array.isArray(json.Workorder)) {
+      allWorkOrders = [json.Workorder as unknown as LightspeedWorkOrder];
+    } else {
+      allWorkOrders = json.Workorder;
+    }
+
+    return allWorkOrders;
+  } catch (error) {
+    console.error('[getWorkOrdersByDate] Unexpected error:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetches all work order statuses and returns a lookup map
+ * (workorderStatusID → name). Cached per request — statuses change rarely.
+ */
+export async function getWorkorderStatuses(
+  shopId: string,
+): Promise<WorkOrderStatusMap> {
+  try {
+    const config = await getLightspeedApiConfig(shopId);
+    if (!config) return {};
+
+    const { token, accountId } = config;
+    const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/WorkorderStatus.json`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        `[getWorkorderStatuses] Lightspeed API error: ${response.status}`,
+      );
+      return {};
+    }
+
+    const json: LightspeedWorkOrderStatusResponse = await response.json();
+    const statuses = json.WorkorderStatus || [];
+
+    const map: WorkOrderStatusMap = {};
+    for (const status of statuses) {
+      map[status.workorderStatusID] = status.name;
+    }
+    return map;
+  } catch (error) {
+    console.error('[getWorkorderStatuses] Unexpected error:', error);
+    return {};
   }
 }
