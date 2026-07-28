@@ -51,7 +51,7 @@ export async function initiateLightspeedAuth() {
     `https://cloud.lightspeedapp.com/auth/oauth/authorize` +
     `?response_type=code` +
     `&client_id=${clientId}` +
-    `&scope=employee:register+employee:inventory+employee:workbench` +
+    `&scope=employee:workbench+employee:inventory_read` +
     `&state=${state}`;
 
   redirect(authUrl);
