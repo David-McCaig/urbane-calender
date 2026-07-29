@@ -9,6 +9,7 @@ import { getValidAccessToken, getLightspeedApiConfig } from "@/lib/lightspeed/ap
 import type { LightspeedWorkOrder, LightspeedWorkOrderResponse, LightspeedWorkOrderStatusResponse, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 const WORK_ORDER_HYDRATION_DEDUPE_MS = 10_000;
+const LIGHTSPEED_HYDRATION_TIMEOUT_MS = 8_000;
 
 export interface WorkOrderHydrationResult {
   status: "ok" | "rate_limited" | "unavailable";
@@ -318,6 +319,7 @@ export async function getWorkOrdersByIds(
         Accept: "application/json",
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(LIGHTSPEED_HYDRATION_TIMEOUT_MS),
     });
 
     logLightspeedRateLimitHeaders(response);
