@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import {
   getExistingWorkorderIds,
@@ -82,6 +82,13 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   const [workOrdersDate, setWorkOrdersDate] = useState(new Date());
   const [activeDragOverlay, setActiveDragOverlay] = useState<DragOverlayData | null>(null);
   const [isDraggingScheduledJob, setIsDraggingScheduledJob] = useState(false);
+  const scheduledWorkorderIdsKey = useMemo(
+    () =>
+      [...new Set(scheduledJobs.map((item) => item.job.workorder_id))]
+        .sort()
+        .join(","),
+    [scheduledJobs],
+  );
 
   // Keep a ref to currentDate so the realtime callbacks always read the latest date
   // without needing to resubscribe when the date changes.
@@ -123,18 +130,20 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     if (!activeShop) return;
 
     let cancelled = false;
-    const workorderIds = scheduledJobs.map((item) => item.job.workorder_id);
+    const workorderIds = scheduledWorkorderIdsKey
+      ? scheduledWorkorderIdsKey.split(",")
+      : [];
     if (workorderIds.length === 0) {
       setScheduledWorkOrders({});
       return;
     }
 
     getWorkOrdersByIds(activeShop.id, workorderIds)
-      .then((orders) => {
-        if (cancelled) return;
+      .then((result) => {
+        if (cancelled || result.status !== "ok") return;
         setScheduledWorkOrders(
           Object.fromEntries(
-            orders.map((order) => [String(order.workorderID), order]),
+            result.orders.map((order) => [String(order.workorderID), order]),
           ),
         );
       })
@@ -145,7 +154,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     return () => {
       cancelled = true;
     };
-  }, [scheduledJobs, activeShop]);
+  }, [scheduledWorkorderIdsKey, activeShop]);
 
   // Load Lightspeed work orders — independent from grid date
   useEffect(() => {

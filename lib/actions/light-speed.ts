@@ -8,6 +8,47 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getValidAccessToken, getLightspeedApiConfig } from "@/lib/lightspeed/api";
 import type { LightspeedWorkOrder, LightspeedWorkOrderResponse, LightspeedWorkOrderStatusResponse, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
+const WORK_ORDER_HYDRATION_DEDUPE_MS = 10_000;
+
+export interface WorkOrderHydrationResult {
+  status: "ok" | "rate_limited" | "unavailable";
+  orders: LightspeedWorkOrder[];
+  retryAfter: string | null;
+}
+
+interface WorkOrderHydrationCacheEntry {
+  expiresAt: number;
+  promise: Promise<WorkOrderHydrationResult>;
+}
+
+const workOrderHydrationRequests = new Map<
+  string,
+  WorkOrderHydrationCacheEntry
+>();
+
+function logLightspeedRateLimitHeaders(response: Response): void {
+  const bucketLevel = response.headers.get("x-ls-api-bucket-level");
+  const dripRate = response.headers.get("x-ls-api-drip-rate");
+  const requestCost = response.headers.get("x-ls-api-request-cost");
+
+  if (!bucketLevel) return;
+
+  const [level, capacity] = bucketLevel.split("/").map(Number);
+  const isNearCapacity =
+    Number.isFinite(level) &&
+    Number.isFinite(capacity) &&
+    capacity > 0 &&
+    level / capacity >= 0.8;
+
+  if (isNearCapacity) {
+    console.warn("[Lightspeed] API bucket nearing capacity", {
+      bucketLevel,
+      dripRate,
+      requestCost,
+    });
+  }
+}
+
 /**
  * Initiates the OAuth flow with Lightspeed. Generates CSRF state server-side,
  * stores it alongside the active shop ID in httpOnly cookies, and redirects
@@ -235,13 +276,26 @@ export async function getWorkOrdersByDate(
 export async function getWorkOrdersByIds(
   shopId: string,
   workorderIds: string[],
-): Promise<LightspeedWorkOrder[]> {
-  const uniqueIds = [...new Set(workorderIds)].filter(Boolean);
-  if (uniqueIds.length === 0) return [];
+): Promise<WorkOrderHydrationResult> {
+  const uniqueIds = [...new Set(workorderIds)].filter(Boolean).sort();
+  if (uniqueIds.length === 0) {
+    return { status: "ok", orders: [], retryAfter: null };
+  }
 
-  try {
+  const cacheKey = `${shopId}:${uniqueIds.join(",")}`;
+  const now = Date.now();
+  const cached = workOrderHydrationRequests.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  for (const [key, entry] of workOrderHydrationRequests) {
+    if (entry.expiresAt <= now) workOrderHydrationRequests.delete(key);
+  }
+
+  const promise = (async (): Promise<WorkOrderHydrationResult> => {
     const config = await getLightspeedApiConfig(shopId);
-    if (!config) return [];
+    if (!config) {
+      return { status: "unavailable", orders: [], retryAfter: null };
+    }
 
     const { token, accountId } = config;
     const idFilter = ["IN", ...uniqueIds].join(",");
@@ -257,11 +311,22 @@ export async function getWorkOrdersByIds(
       cache: "no-store",
     });
 
+    logLightspeedRateLimitHeaders(response);
+
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("retry-after");
+      console.warn("[getWorkOrdersByIds] Lightspeed rate limit reached", {
+        retryAfter,
+        bucketLevel: response.headers.get("x-ls-api-bucket-level"),
+      });
+      return { status: "rate_limited", orders: [], retryAfter };
+    }
+
     if (!response.ok) {
       console.error(
         `[getWorkOrdersByIds] Lightspeed API error: ${response.status}`,
       );
-      return [];
+      return { status: "unavailable", orders: [], retryAfter: null };
     }
 
     const json: LightspeedWorkOrderResponse = await response.json();
@@ -270,16 +335,25 @@ export async function getWorkOrdersByIds(
       (!Array.isArray(json.Workorder) &&
         Object.keys(json.Workorder).length === 0)
     ) {
-      return [];
+      return { status: "ok", orders: [], retryAfter: null };
     }
 
-    return Array.isArray(json.Workorder)
+    const orders = Array.isArray(json.Workorder)
       ? json.Workorder
       : [json.Workorder as unknown as LightspeedWorkOrder];
-  } catch (error) {
+
+    return { status: "ok", orders, retryAfter: null };
+  })().catch((error): WorkOrderHydrationResult => {
     console.error("[getWorkOrdersByIds] Unexpected error:", error);
-    return [];
-  }
+    return { status: "unavailable", orders: [], retryAfter: null };
+  });
+
+  workOrderHydrationRequests.set(cacheKey, {
+    expiresAt: now + WORK_ORDER_HYDRATION_DEDUPE_MS,
+    promise,
+  });
+
+  return promise;
 }
 
 /**
