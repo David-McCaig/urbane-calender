@@ -53,8 +53,10 @@ interface UseCalendarDataReturn {
   navigateWorkOrdersDate: (direction: "prev" | "next") => void;
   // Drag and drop
   activeDragOverlay: DragOverlayData | null;
+  isDraggingScheduledJob: boolean;
   handleDragStart: (event: DragStartEvent) => void;
   handleDragEnd: (event: DragEndEvent) => void;
+  handleDragCancel: () => void;
   // CRUD
   removeScheduledJob: (scheduledJobId: string) => Promise<void>;
 }
@@ -71,6 +73,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   const [currentDate, setCurrentDate] = useState(new Date());
   const [workOrdersDate, setWorkOrdersDate] = useState(new Date());
   const [activeDragOverlay, setActiveDragOverlay] = useState<DragOverlayData | null>(null);
+  const [isDraggingScheduledJob, setIsDraggingScheduledJob] = useState(false);
 
   // Keep a ref to currentDate so the realtime callbacks always read the latest date
   // without needing to resubscribe when the date changes.
@@ -197,6 +200,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
 
   const handleDragStart = (event: DragStartEvent) => {
     const dragId = event.active.id as string;
+    setIsDraggingScheduledJob(false);
 
     // Lightspeed work order drag
     if (dragId.startsWith("ls-")) {
@@ -223,6 +227,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     // Existing scheduled job drag
     const scheduledJob = scheduledJobs.find((j) => j.id === dragId);
     if (scheduledJob?.job) {
+      setIsDraggingScheduledJob(true);
       setActiveDragOverlay({
         title: scheduledJob.job.hook_in,
         subtitle: `Customer ${scheduledJob.job.customer_id} • ${scheduledJob.job.duration}h`,
@@ -233,6 +238,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDragOverlay(null);
+    setIsDraggingScheduledJob(false);
 
     if (!over) return;
 
@@ -396,6 +402,11 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     }
   };
 
+  const handleDragCancel = () => {
+    setActiveDragOverlay(null);
+    setIsDraggingScheduledJob(false);
+  };
+
   const removeScheduledJob = async (scheduledJobId: string) => {
     const dateString = formatLocalDate(currentDate);
     const scheduledJob = scheduledJobs.find((sj) => sj.id === scheduledJobId);
@@ -441,8 +452,10 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     setWorkOrdersDate,
     navigateWorkOrdersDate,
     activeDragOverlay,
+    isDraggingScheduledJob,
     handleDragStart,
     handleDragEnd,
+    handleDragCancel,
     removeScheduledJob,
   };
 }

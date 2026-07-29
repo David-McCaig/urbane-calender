@@ -31,8 +31,10 @@ export default function Calendar() {
     setWorkOrdersDate,
     navigateWorkOrdersDate,
     activeDragOverlay,
+    isDraggingScheduledJob,
     handleDragStart,
     handleDragEnd,
+    handleDragCancel,
     removeScheduledJob,
   } = useCalendarData(activeShop);
 
@@ -82,6 +84,7 @@ export default function Calendar() {
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="h-[calc(100vh-3.5rem)] bg-gray-50 flex">
         <CalendarGrid
@@ -110,6 +113,7 @@ export default function Calendar() {
           onNavigateDate={navigateWorkOrdersDate}
           onGoToToday={() => setWorkOrdersDate(new Date())}
           onDateSelect={setWorkOrdersDate}
+          isDraggingScheduledJob={isDraggingScheduledJob}
         />
 
         <DragOverlay>

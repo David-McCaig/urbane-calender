@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, CalendarIcon, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { useDroppable } from "@dnd-kit/core";
+import {
+  Search,
+  CalendarIcon,
+  CalendarMinus,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +22,6 @@ import {
 } from "@/components/ui/accordion";
 import { DraggableWorkOrder } from "./draggable-work-order";
 import { DatePicker } from "./date-picker";
-import DropZone from "./drop-zone";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 // ---------------------------------------------------------------------------
@@ -29,6 +36,7 @@ interface JobsPanelProps {
   onNavigateDate: (direction: "prev" | "next") => void;
   onGoToToday: () => void;
   onDateSelect: (date: Date) => void;
+  isDraggingScheduledJob: boolean;
 }
 
 function formatDate(date: Date): string {
@@ -40,24 +48,8 @@ function formatDate(date: Date): string {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-export function JobsPanel({
-  workOrders,
-  workOrderStatusMap,
-  loadingWorkOrders,
-  currentDate,
-  onNavigateDate,
-  onGoToToday,
-  onDateSelect,
-}: JobsPanelProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showInlineDatePicker, setShowInlineDatePicker] = useState(false);
-  const [openCategories, setOpenCategories] = useState<string[]>([]);
-
-  // Hardcoded category display order. Categories not in this list appear after, sorted alphabetically.
+// Hardcoded category display order. Categories not in this list appear after,
+// sorted alphabetically.
 const CATEGORY_ORDER: string[] = [
   "Appointment",
   "Assessment",
@@ -73,21 +65,45 @@ const CATEGORY_ORDER: string[] = [
 ];
 
 function sortCategories(categories: string[]): string[] {
-  const known = CATEGORY_ORDER.filter((c) => categories.includes(c));
+  const known = CATEGORY_ORDER.filter((category) =>
+    categories.includes(category)
+  );
   const unknown = categories
-    .filter((c) => !CATEGORY_ORDER.includes(c))
+    .filter((category) => !CATEGORY_ORDER.includes(category))
     .sort();
   return [...known, ...unknown];
 }
 
-// Derive categories from Lightspeed status names + any status IDs found in data
-const effectiveCategories = useMemo(() => {
-  const fromMap = Object.values(workOrderStatusMap);
-  const fromData = workOrders.map(
-    (wo) => workOrderStatusMap[wo.workorderStatusID] || "Unknown"
-  );
-  return sortCategories([...new Set([...fromMap, ...fromData])]);
-}, [workOrderStatusMap, workOrders]);
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function JobsPanel({
+  workOrders,
+  workOrderStatusMap,
+  loadingWorkOrders,
+  currentDate,
+  onNavigateDate,
+  onGoToToday,
+  onDateSelect,
+  isDraggingScheduledJob,
+}: JobsPanelProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showInlineDatePicker, setShowInlineDatePicker] = useState(false);
+  const [openCategories, setOpenCategories] = useState<string[]>([]);
+  const { isOver, setNodeRef } = useDroppable({
+    id: "unscheduled-jobs",
+    disabled: !isDraggingScheduledJob,
+  });
+
+  // Derive categories from Lightspeed status names + any status IDs found in data
+  const effectiveCategories = useMemo(() => {
+    const fromMap = Object.values(workOrderStatusMap);
+    const fromData = workOrders.map(
+      (wo) => workOrderStatusMap[wo.workorderStatusID] || "Unknown"
+    );
+    return sortCategories([...new Set([...fromMap, ...fromData])]);
+  }, [workOrderStatusMap, workOrders]);
 
   // Group work orders by status name
   const grouped = useMemo(() => {
@@ -153,7 +169,23 @@ const effectiveCategories = useMemo(() => {
   const isLoading = loadingWorkOrders && workOrders.length === 0;
 
   return (
-    <div className="w-[30%] flex-shrink-0 bg-white border-l shadow-lg flex flex-col h-full pt-6">
+    <div
+      ref={setNodeRef}
+      className="relative w-[30%] flex-shrink-0 bg-white border-l shadow-lg flex flex-col h-full pt-6"
+    >
+      {isOver && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-blue-50/85 p-5 backdrop-blur-[1px]">
+          <div className="w-full max-w-[240px] rounded-2xl bg-white/95 p-6 text-center shadow-xl shadow-blue-950/10">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+              <CalendarMinus className="h-6 w-6 text-blue-700" />
+            </div>
+            <p className="text-base font-semibold text-slate-900">
+              Drop to unschedule
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="px-4 pb-4 border-b space-y-3">
         <div className="flex items-center justify-between">
@@ -309,19 +341,6 @@ const effectiveCategories = useMemo(() => {
           </Accordion>
         )}
 
-        {/* Drop zone for unscheduling — hidden while searching */}
-        {!searchQuery.trim() && workOrders.length > 0 && !isLoading && (
-          <div className="px-4 py-3">
-            <DropZone
-              id="unscheduled-jobs"
-              className="min-h-[80px] border-2 border-dashed border-gray-200 rounded-lg p-3 transition-colors hover:border-gray-300"
-            >
-              <p className="text-xs text-gray-400 text-center">
-                Drag scheduled jobs here to unschedule
-              </p>
-            </DropZone>
-          </div>
-        )}
       </div>
     </div>
   );
