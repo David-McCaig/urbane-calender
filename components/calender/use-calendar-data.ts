@@ -103,6 +103,10 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   // can re-check only the displayed IDs without resubscribing on every data change.
   const workOrderIdsRef = useRef<string[]>([]);
 
+  // Track which shop owns the hydrated work-order map so details from one shop
+  // cannot remain visible after switching to another.
+  const hydratedWorkOrdersShopIdRef = useRef<string | null>(null);
+
   // Load grid data — mechanics, scheduled jobs, local jobs, statuses
   useEffect(() => {
     if (!activeShop) return;
@@ -127,7 +131,12 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   // Hydrate scheduled cards with current Lightspeed data. Supabase remains
   // responsible only for placement and duration.
   useEffect(() => {
-    if (!activeShop) return;
+    const shopId = activeShop?.id ?? null;
+    if (hydratedWorkOrdersShopIdRef.current !== shopId) {
+      hydratedWorkOrdersShopIdRef.current = shopId;
+      setScheduledWorkOrders({});
+    }
+    if (!shopId) return;
 
     let cancelled = false;
     const workorderIds = scheduledWorkorderIdsKey
@@ -138,7 +147,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       return;
     }
 
-    getWorkOrdersByIds(activeShop.id, workorderIds)
+    getWorkOrdersByIds(shopId, workorderIds)
       .then((result) => {
         if (cancelled || result.status !== "ok") return;
         setScheduledWorkOrders(
