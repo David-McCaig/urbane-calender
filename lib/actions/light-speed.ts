@@ -282,6 +282,14 @@ export async function getWorkOrdersByIds(
     return { status: "ok", orders: [], retryAfter: null };
   }
 
+  // Authorize every caller before consulting the process-wide cache. The cache
+  // is shared across requests, so returning a warm entry first could expose one
+  // shop's work orders to a caller who is not a member of that shop.
+  const config = await getLightspeedApiConfig(shopId);
+  if (!config) {
+    return { status: "unavailable", orders: [], retryAfter: null };
+  }
+
   const cacheKey = `${shopId}:${uniqueIds.join(",")}`;
   const now = Date.now();
   const cached = workOrderHydrationRequests.get(cacheKey);
@@ -292,11 +300,6 @@ export async function getWorkOrdersByIds(
   }
 
   const promise = (async (): Promise<WorkOrderHydrationResult> => {
-    const config = await getLightspeedApiConfig(shopId);
-    if (!config) {
-      return { status: "unavailable", orders: [], retryAfter: null };
-    }
-
     const { token, accountId } = config;
     const idFilter = ["IN", ...uniqueIds].join(",");
     const queryString =
