@@ -19,6 +19,7 @@ export default function Calendar() {
   const {
     mechanics,
     scheduledJobs,
+    scheduledWorkOrders,
     workOrders,
     workOrderStatusMap,
     loadingGrid,
@@ -90,6 +91,8 @@ export default function Calendar() {
         <CalendarGrid
           mechanics={mechanics}
           scheduledJobs={scheduledJobs}
+          scheduledWorkOrders={scheduledWorkOrders}
+          workOrderStatusMap={workOrderStatusMap}
           currentDate={currentDate}
           loadingGrid={loadingGrid}
           showDatePicker={showDatePicker}

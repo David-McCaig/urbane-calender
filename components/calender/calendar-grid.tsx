@@ -9,10 +9,13 @@ import { ScheduledJobBlock } from "./scheduled-job-block";
 import { DatePicker } from "./date-picker";
 import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
 import type { Mechanic, ScheduledJob } from "@/lib/database/calendar";
+import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 interface CalendarGridProps {
   mechanics: Mechanic[];
   scheduledJobs: ScheduledJob[];
+  scheduledWorkOrders: Record<string, LightspeedWorkOrder>;
+  workOrderStatusMap: WorkOrderStatusMap;
   currentDate: Date;
   loadingGrid: boolean;
   showDatePicker: boolean;
@@ -37,6 +40,8 @@ function formatDate(date: Date) {
 export function CalendarGrid({
   mechanics,
   scheduledJobs,
+  scheduledWorkOrders,
+  workOrderStatusMap,
   currentDate,
   loadingGrid,
   showDatePicker,
@@ -231,6 +236,29 @@ export function CalendarGrid({
                       <ScheduledJobBlock
                         key={scheduledJob.id}
                         scheduledJob={scheduledJob}
+                        cardData={(() => {
+                          const workOrder =
+                            scheduledWorkOrders[scheduledJob.job.workorder_id];
+                          return {
+                            hookIn:
+                              workOrder?.hookIn ||
+                              scheduledJob.job.hook_in ||
+                              `Work order #${scheduledJob.job.workorder_id}`,
+                            customerName:
+                              workOrder?.Customer
+                                ? `${workOrder.Customer.firstName} ${workOrder.Customer.lastName}`
+                                : scheduledJob.job.customer_id,
+                            customerItem:
+                              workOrder?.Serialized?.description ||
+                              "Customer item unavailable",
+                            status:
+                              workOrderStatusMap[
+                                workOrder?.workorderStatusID ||
+                                  scheduledJob.job.workorder_status_id
+                              ] || "Unknown",
+                            duration: scheduledJob.job.duration,
+                          };
+                        })()}
                         onRemove={() =>
                           onRemoveScheduledJob(scheduledJob.id)
                         }

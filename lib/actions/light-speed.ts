@@ -190,7 +190,7 @@ export async function getWorkOrdersByDate(
     // Lightspeed between operator: %3E%3C = ><  ,  %2C = ,
     const queryString =
       `etaOut=%3E%3C%2C${encodeURIComponent(startISO)}%2C${encodeURIComponent(endISO)}` +
-      `&load_relations=${encodeURIComponent('["Customer"]')}`;
+      `&load_relations=${encodeURIComponent('["Customer","Serialized"]')}`;
 
     const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/Workorder.json?${queryString}`;
 
@@ -224,6 +224,60 @@ export async function getWorkOrdersByDate(
     return allWorkOrders;
   } catch (error) {
     console.error('[getWorkOrdersByDate] Unexpected error:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetches the current Lightspeed records for scheduled work orders.
+ * Lightspeed's IN filter keeps calendar hydration to a single API request.
+ */
+export async function getWorkOrdersByIds(
+  shopId: string,
+  workorderIds: string[],
+): Promise<LightspeedWorkOrder[]> {
+  const uniqueIds = [...new Set(workorderIds)].filter(Boolean);
+  if (uniqueIds.length === 0) return [];
+
+  try {
+    const config = await getLightspeedApiConfig(shopId);
+    if (!config) return [];
+
+    const { token, accountId } = config;
+    const idFilter = ["IN", ...uniqueIds].join(",");
+    const queryString =
+      `workorderID=${encodeURIComponent(idFilter)}` +
+      `&load_relations=${encodeURIComponent('["Customer","Serialized"]')}`;
+    const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/Workorder.json?${queryString}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(
+        `[getWorkOrdersByIds] Lightspeed API error: ${response.status}`,
+      );
+      return [];
+    }
+
+    const json: LightspeedWorkOrderResponse = await response.json();
+    if (
+      !json.Workorder ||
+      (!Array.isArray(json.Workorder) &&
+        Object.keys(json.Workorder).length === 0)
+    ) {
+      return [];
+    }
+
+    return Array.isArray(json.Workorder)
+      ? json.Workorder
+      : [json.Workorder as unknown as LightspeedWorkOrder];
+  } catch (error) {
+    console.error("[getWorkOrdersByIds] Unexpected error:", error);
     return [];
   }
 }
