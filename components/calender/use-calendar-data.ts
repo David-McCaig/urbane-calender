@@ -32,6 +32,7 @@ const HYDRATION_MIN_RETRY_MS = 11_000;
 const HYDRATION_BASE_RETRY_MS = 15_000;
 const HYDRATION_MAX_RETRY_MS = 5 * 60_000;
 const HYDRATION_RETRY_JITTER_MS = 1_000;
+const HYDRATION_MAX_ATTEMPTS = 5;
 
 /** Format a Date as YYYY-MM-DD in the local timezone — avoids the UTC shift of toISOString(). */
 export function formatLocalDate(date: Date): string {
@@ -173,7 +174,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
 
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let retryAttempt = 0;
+    let hydrationAttempt = 0;
     const workorderIds = scheduledWorkorderIdsKey
       ? scheduledWorkorderIdsKey.split(",")
       : [];
@@ -183,12 +184,15 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     }
 
     const hydrateWorkOrders = () => {
+      hydrationAttempt += 1;
       getWorkOrdersByIds(shopId, workorderIds)
         .then((result) => {
           if (cancelled) return;
           if (result.status !== "ok") {
-            const delay = getHydrationRetryDelay(result, retryAttempt);
-            retryAttempt += 1;
+            if (!result.retryable || hydrationAttempt >= HYDRATION_MAX_ATTEMPTS) {
+              return;
+            }
+            const delay = getHydrationRetryDelay(result, hydrationAttempt - 1);
             retryTimer = setTimeout(hydrateWorkOrders, delay);
             return;
           }
@@ -201,11 +205,14 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
         .catch((error) => {
           if (cancelled) return;
           console.error("Error hydrating scheduled work orders:", error);
-          const delay = getHydrationRetryDelay(
-            { status: "unavailable", orders: [], retryAfter: null },
-            retryAttempt,
-          );
-          retryAttempt += 1;
+          if (hydrationAttempt >= HYDRATION_MAX_ATTEMPTS) return;
+          const retryResult: WorkOrderHydrationResult = {
+            status: "unavailable",
+            orders: [],
+            retryAfter: null,
+            retryable: true,
+          };
+          const delay = getHydrationRetryDelay(retryResult, hydrationAttempt - 1);
           retryTimer = setTimeout(hydrateWorkOrders, delay);
         });
     };

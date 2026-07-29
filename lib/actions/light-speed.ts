@@ -14,6 +14,7 @@ export interface WorkOrderHydrationResult {
   status: "ok" | "rate_limited" | "unavailable";
   orders: LightspeedWorkOrder[];
   retryAfter: string | null;
+  retryable: boolean;
 }
 
 interface WorkOrderHydrationCacheEntry {
@@ -279,7 +280,7 @@ export async function getWorkOrdersByIds(
 ): Promise<WorkOrderHydrationResult> {
   const uniqueIds = [...new Set(workorderIds)].filter(Boolean).sort();
   if (uniqueIds.length === 0) {
-    return { status: "ok", orders: [], retryAfter: null };
+    return { status: "ok", orders: [], retryAfter: null, retryable: false };
   }
 
   // Authorize every caller before consulting the process-wide cache. The cache
@@ -287,7 +288,12 @@ export async function getWorkOrdersByIds(
   // shop's work orders to a caller who is not a member of that shop.
   const config = await getLightspeedApiConfig(shopId);
   if (!config) {
-    return { status: "unavailable", orders: [], retryAfter: null };
+    return {
+      status: "unavailable",
+      orders: [],
+      retryAfter: null,
+      retryable: false,
+    };
   }
 
   const cacheKey = `${shopId}:${uniqueIds.join(",")}`;
@@ -322,14 +328,24 @@ export async function getWorkOrdersByIds(
         retryAfter,
         bucketLevel: response.headers.get("x-ls-api-bucket-level"),
       });
-      return { status: "rate_limited", orders: [], retryAfter };
+      return {
+        status: "rate_limited",
+        orders: [],
+        retryAfter,
+        retryable: true,
+      };
     }
 
     if (!response.ok) {
       console.error(
         `[getWorkOrdersByIds] Lightspeed API error: ${response.status}`,
       );
-      return { status: "unavailable", orders: [], retryAfter: null };
+      return {
+        status: "unavailable",
+        orders: [],
+        retryAfter: null,
+        retryable: response.status >= 500,
+      };
     }
 
     const json: LightspeedWorkOrderResponse = await response.json();
@@ -338,17 +354,22 @@ export async function getWorkOrdersByIds(
       (!Array.isArray(json.Workorder) &&
         Object.keys(json.Workorder).length === 0)
     ) {
-      return { status: "ok", orders: [], retryAfter: null };
+      return { status: "ok", orders: [], retryAfter: null, retryable: false };
     }
 
     const orders = Array.isArray(json.Workorder)
       ? json.Workorder
       : [json.Workorder as unknown as LightspeedWorkOrder];
 
-    return { status: "ok", orders, retryAfter: null };
+    return { status: "ok", orders, retryAfter: null, retryable: false };
   })().catch((error): WorkOrderHydrationResult => {
     console.error("[getWorkOrdersByIds] Unexpected error:", error);
-    return { status: "unavailable", orders: [], retryAfter: null };
+    return {
+      status: "unavailable",
+      orders: [],
+      retryAfter: null,
+      retryable: true,
+    };
   });
 
   workOrderHydrationRequests.set(cacheKey, {
