@@ -20,7 +20,11 @@ import {
   type Mechanic,
   type ScheduledJob,
 } from "@/lib/database/calendar";
-import { getWorkOrdersByDate, getWorkorderStatuses } from "@/lib/actions/light-speed";
+import {
+  getWorkOrdersByDate,
+  getWorkOrdersByIds,
+  getWorkorderStatuses,
+} from "@/lib/actions/light-speed";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 /** Format a Date as YYYY-MM-DD in the local timezone — avoids the UTC shift of toISOString(). */
@@ -38,6 +42,7 @@ interface UseCalendarDataReturn {
   // Data
   mechanics: Mechanic[];
   scheduledJobs: ScheduledJob[];
+  scheduledWorkOrders: Record<string, LightspeedWorkOrder>;
   workOrders: LightspeedWorkOrder[];
   workOrderStatusMap: WorkOrderStatusMap;
   loadingGrid: boolean;
@@ -64,6 +69,9 @@ interface UseCalendarDataReturn {
 export function useCalendarData(activeShop: { id: string } | null): UseCalendarDataReturn {
   const [existingWorkorderIds, setExistingWorkorderIds] = useState<Set<string>>(new Set());
   const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
+  const [scheduledWorkOrders, setScheduledWorkOrders] = useState<
+    Record<string, LightspeedWorkOrder>
+  >({});
   const [mechanics, setMechanics] = useState<Mechanic[]>([]);
   const [allWorkOrders, setAllWorkOrders] = useState<LightspeedWorkOrder[]>([]);
   const [workOrders, setWorkOrders] = useState<LightspeedWorkOrder[]>([]);
@@ -108,6 +116,36 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       .then(setWorkOrderStatusMap)
       .catch(console.error);
   }, [currentDate, activeShop]);
+
+  // Hydrate scheduled cards with current Lightspeed data. Supabase remains
+  // responsible only for placement and duration.
+  useEffect(() => {
+    if (!activeShop) return;
+
+    let cancelled = false;
+    const workorderIds = scheduledJobs.map((item) => item.job.workorder_id);
+    if (workorderIds.length === 0) {
+      setScheduledWorkOrders({});
+      return;
+    }
+
+    getWorkOrdersByIds(activeShop.id, workorderIds)
+      .then((orders) => {
+        if (cancelled) return;
+        setScheduledWorkOrders(
+          Object.fromEntries(
+            orders.map((order) => [String(order.workorderID), order]),
+          ),
+        );
+      })
+      .catch((error) => {
+        console.error("Error hydrating scheduled work orders:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scheduledJobs, activeShop]);
 
   // Load Lightspeed work orders — independent from grid date
   useEffect(() => {
@@ -206,19 +244,17 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     if (dragId.startsWith("ls-")) {
       const workorder = event.active.data.current?.workorder as LightspeedWorkOrder | undefined;
       if (workorder) {
-        const itemDescription =
+        const hookIn =
           workorder.hookIn || `WO #${workorder.workorderID}`;
         const customerName = workorder.Customer
           ? `${workorder.Customer.firstName} ${workorder.Customer.lastName}`
           : `Customer #${workorder.customerID}`;
-        const etaTime = new Date(workorder.etaOut).toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-        });
+        const customerItem =
+          workorder.Serialized?.description || "Customer item unavailable";
 
         setActiveDragOverlay({
-          title: itemDescription,
-          subtitle: `${customerName} • ETA ${etaTime}`,
+          title: hookIn,
+          subtitle: `${customerName} • ${customerItem} • 1h`,
         });
       }
       return;
@@ -227,10 +263,16 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     // Existing scheduled job drag
     const scheduledJob = scheduledJobs.find((j) => j.id === dragId);
     if (scheduledJob?.job) {
+      const workOrder = scheduledWorkOrders[scheduledJob.job.workorder_id];
+      const customerName = workOrder?.Customer
+        ? `${workOrder.Customer.firstName} ${workOrder.Customer.lastName}`
+        : scheduledJob.job.customer_id;
+      const customerItem =
+        workOrder?.Serialized?.description || "Customer item unavailable";
       setIsDraggingScheduledJob(true);
       setActiveDragOverlay({
-        title: scheduledJob.job.hook_in,
-        subtitle: `Customer ${scheduledJob.job.customer_id} • ${scheduledJob.job.duration}h`,
+        title: workOrder?.hookIn || scheduledJob.job.hook_in,
+        subtitle: `${customerName} • ${customerItem} • ${scheduledJob.job.duration}h`,
       });
     }
   };
@@ -297,7 +339,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       const customerName = workorder.Customer
         ? `${workorder.Customer.firstName} ${workorder.Customer.lastName}`
         : `Customer #${workorder.customerID}`;
-      const itemDescription =
+      const hookIn =
         workorder.hookIn || `Work Order #${workorder.workorderID}`;
 
       try {
@@ -311,7 +353,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
             time_in: workorder.timeIn,
             eta_out: workorder.etaOut,
             customer_id: customerName,
-            hook_in: itemDescription,
+            hook_in: hookIn,
             workorder_status_id: workorder.workorderStatusID,
             sale_id: workorder.saleID || "0",
             sale_line_id: workorder.saleLineID || "0",
@@ -440,6 +482,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   return {
     mechanics,
     scheduledJobs,
+    scheduledWorkOrders,
     workOrders,
     workOrderStatusMap,
     loadingGrid,

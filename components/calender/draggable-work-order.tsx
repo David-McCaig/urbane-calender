@@ -1,7 +1,7 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/core";
-import { Badge } from "@/components/ui/badge";
+import { JobCardContent } from "@/components/calender/job-card-content";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 export function DraggableWorkOrder({
@@ -23,17 +23,13 @@ export function DraggableWorkOrder({
       }
     : undefined;
 
-  const itemDescription =
-    workorder.hookIn || "No item description";
+  const hookIn = workorder.hookIn || `Work order #${workorder.workorderID}`;
   const customerName = workorder.Customer
     ? `${workorder.Customer.firstName} ${workorder.Customer.lastName}`
     : `Customer #${workorder.customerID}`;
-  const statusName =
-    statusMap[workorder.workorderStatusID] || "Unknown";
-  const etaTime = new Date(workorder.etaOut).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const customerItem =
+    workorder.Serialized?.description || "Customer item unavailable";
+  const statusName = statusMap[workorder.workorderStatusID] || "Unknown";
 
   return (
     <div
@@ -41,24 +37,19 @@ export function DraggableWorkOrder({
       style={style}
       {...listeners}
       {...attributes}
-      className={`p-3 rounded-lg border border-l-4 cursor-move hover:shadow-md transition-all border-l-green-400 bg-green-50 ${
+      className={`rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-3 cursor-move shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
         isDragging ? "opacity-50" : ""
       }`}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm text-gray-900 truncate">
-            {itemDescription}
-          </div>
-          <div className="text-xs text-gray-500 truncate">{customerName}</div>
-          <div className="text-xs text-gray-400 mt-0.5">
-            ETA {etaTime}
-          </div>
-        </div>
-        <Badge variant="secondary" className="text-xs flex-shrink-0 ml-2">
-          {statusName}
-        </Badge>
-      </div>
+      <JobCardContent
+        job={{
+          hookIn,
+          customerName,
+          customerItem,
+          status: statusName,
+          duration: 1,
+        }}
+      />
     </div>
   );
 }

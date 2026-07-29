@@ -1,12 +1,15 @@
 import { useDraggable } from "@dnd-kit/core";
-import { Badge } from "@/components/ui/badge";
 import type { ScheduledJob } from "@/lib/database/calendar";
+import type { JobCardData } from "@/components/calender/job-card-content";
+import { JobCardContent } from "@/components/calender/job-card-content";
 
 export function ScheduledJobBlock({
   scheduledJob,
+  cardData,
   onRemove,
 }: {
   scheduledJob: ScheduledJob;
+  cardData: JobCardData;
   onRemove: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
@@ -33,19 +36,13 @@ export function ScheduledJobBlock({
       }}
       {...listeners}
       {...attributes}
-      className={`absolute left-1 right-1 rounded-md border-2 p-2 cursor-move hover:shadow-md transition-shadow bg-blue-100 border-blue-300 text-blue-800 ${isDragging ? "opacity-50 z-50" : ""}`}
+      className={`absolute left-1 right-1 overflow-hidden rounded-lg border border-blue-200 border-l-4 border-l-blue-500 bg-white p-2 cursor-move shadow-sm transition-all hover:shadow-md ${isDragging ? "opacity-50 z-50" : ""}`}
       onContextMenu={(e) => {
         e.preventDefault();
         onRemove();
       }}
     >
-      <div className="text-xs font-medium truncate">{scheduledJob.job.hook_in}</div>
-      <div className="text-xs opacity-75 truncate">Customer {scheduledJob.job.customer_id}</div>
-      <div className="text-xs opacity-75">{scheduledJob.job.duration}h</div>
-      <Badge variant="secondary" className="text-xs mt-1">
-        {scheduledJob.job.workorder_id}
-      </Badge>
-      <div className="absolute top-1 right-1 text-xs opacity-50">⋮⋮</div>
+      <JobCardContent job={cardData} compact />
     </div>
   );
 }

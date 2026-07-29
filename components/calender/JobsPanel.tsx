@@ -132,6 +132,7 @@ export function JobsPanel({
     for (const cat of effectiveCategories) {
       const items = (grouped[cat] || []).filter((wo) => {
         const desc = (wo.hookIn || "").toLowerCase();
+        const customerItem = (wo.Serialized?.description || "").toLowerCase();
         const woId = String(wo.workorderID).toLowerCase();
         const cust = wo.Customer
           ? `${wo.Customer.firstName} ${wo.Customer.lastName}`.toLowerCase()
@@ -141,6 +142,7 @@ export function JobsPanel({
         ).toLowerCase();
         return (
           desc.includes(q) ||
+          customerItem.includes(q) ||
           woId.includes(q) ||
           cust.includes(q) ||
           status.includes(q)
