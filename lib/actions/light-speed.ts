@@ -6,6 +6,10 @@ import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getValidAccessToken, getLightspeedApiConfig } from "@/lib/lightspeed/api";
+import {
+  getLightspeedWorkOrderDateRange,
+  isWorkOrderOnDate,
+} from "@/lib/lightspeed/work-order-date";
 import type { LightspeedWorkOrder, LightspeedWorkOrderResponse, LightspeedWorkOrderStatusResponse, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 const WORK_ORDER_HYDRATION_DEDUPE_MS = 10_000;
@@ -220,15 +224,10 @@ export async function getWorkOrdersByDate(
 
     const { token, accountId } = config;
 
-    // Build date range — etaOut on the given date using Lightspeed's
-    // between-operator query: ?etaOut=><,startISO,endISO
-    // Parse manually to avoid new Date("YYYY-MM-DD") which is UTC-parsed
-    // and shifts the date in non-UTC timezones.
-    const [year, month, day] = date.split('-').map(Number);
-    const startDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const endDate = new Date(year, month - 1, day, 23, 59, 59, 999);
-    const startISO = startDate.toISOString();
-    const endISO = endDate.toISOString();
+    // Fetch a UTC buffer around the selected date, then filter by the date
+    // portion of etaOut. This keeps server timezones and time-of-day values
+    // from excluding work orders that belong to the selected calendar day.
+    const { startISO, endISO } = getLightspeedWorkOrderDateRange(date);
 
     // Lightspeed between operator: %3E%3C = ><  ,  %2C = ,
     const queryString =
@@ -264,7 +263,9 @@ export async function getWorkOrdersByDate(
       allWorkOrders = json.Workorder;
     }
 
-    return allWorkOrders;
+    return allWorkOrders.filter((workOrder) =>
+      isWorkOrderOnDate(workOrder.etaOut, date),
+    );
   } catch (error) {
     console.error('[getWorkOrdersByDate] Unexpected error:', error);
     return [];
