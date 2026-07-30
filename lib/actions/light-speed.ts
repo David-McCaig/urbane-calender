@@ -74,6 +74,26 @@ function mergeRawLines(
   ];
 }
 
+function enrichWithSaleLines(
+  lines: unknown[],
+  saleLines: unknown[],
+): unknown[] {
+  const saleLinesById = new Map(
+    saleLines.map((value) => {
+      const record = asRecord(value);
+      return [String(record.saleLineID ?? ""), record];
+    }),
+  );
+
+  return lines.map((value) => {
+    const line = asRecord(value);
+    const saleLine = saleLinesById.get(String(line.saleLineID ?? ""));
+    // Keep work-order fields and relations authoritative while adding the
+    // calculated subtotal, discount, and taxes from the linked SaleLine.
+    return saleLine ? { ...saleLine, ...line } : line;
+  });
+}
+
 function numberValue(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -685,10 +705,30 @@ export async function getWorkOrderDetails(
       "workorderLineID",
     );
 
-    const parts = rawItems.map((line, index) =>
+    const saleLineIds = [...rawItems, ...rawLines]
+      .map((value) => String(asRecord(value).saleLineID ?? ""))
+      .filter((id) => id && id !== "0");
+    let relatedSaleLines: unknown[] = [];
+
+    if (saleLineIds.length > 0) {
+      const idFilter = ["IN", ...new Set(saleLineIds)].join(",");
+      const saleLinesUrl =
+        `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
+        `/SaleLine.json?saleLineID=${encodeURIComponent(idFilter)}`;
+      const saleLinesJson = await fetchLightspeedJson(saleLinesUrl, token);
+      relatedSaleLines = relationArray(
+        saleLinesJson,
+        "SaleLine",
+        "SaleLines",
+      );
+    }
+
+    const enrichedItems = enrichWithSaleLines(rawItems, relatedSaleLines);
+    const enrichedLines = enrichWithSaleLines(rawLines, relatedSaleLines);
+    const parts = enrichedItems.map((line, index) =>
       normalizeSaleLine(line, index, "part"),
     );
-    const labour = rawLines.map((line, index) =>
+    const labour = enrichedLines.map((line, index) =>
       normalizeWorkOrderLine(line, index),
     );
     lines = [...labour, ...parts];
@@ -721,9 +761,10 @@ export async function getWorkOrderDetails(
     );
     const discounts = workOrderDiscount || lineDiscounts;
     const tax =
+      lineTax ||
       numberValue(saleRecord.calcTax) ||
       numberValue(saleRecord.calcTax1) + numberValue(saleRecord.calcTax2) ||
-      lineTax;
+      0;
 
     const details: LightspeedWorkOrderDetails = {
       ...workOrder,
