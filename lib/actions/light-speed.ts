@@ -793,10 +793,11 @@ export async function getWorkOrderDetails(
       numberValue(saleRecord.taxTotal) ||
       0;
 
-    // Open work orders often have no calculated Sale tax yet. Workorder.tax
-    // only indicates whether tax applies; the rates live on the applicable
-    // TaxCategory (sale/customer override, then the shop default).
-    if (tax === 0 && booleanValue(workOrderRecord.tax)) {
+    // Open work orders often have no calculated Sale tax yet. In practice,
+    // Lightspeed can return Workorder.tax=false while its UI still previews
+    // tax from the shop configuration, so do not gate this fallback on that
+    // field. Prefer calculated line/sale tax above whenever it exists.
+    if (tax === 0) {
       const shopId = String(workOrderRecord.shopID ?? "");
       const customer = asRecord(workOrderRecord.Customer);
       const shopUrl =
