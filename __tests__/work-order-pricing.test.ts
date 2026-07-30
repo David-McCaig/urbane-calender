@@ -147,4 +147,20 @@ describe("calculateWorkOrderTotals", () => {
       }).tax,
     ).toBe(5);
   });
+
+  it("uses aggregate line tax instead of adding component taxes twice", () => {
+    const part = normalizeWorkOrderPricingLine(
+      {
+        unitPrice: 100,
+        calcTax: 13,
+        calcTax1: 5,
+        calcTax2: 8,
+      },
+      0,
+      "part",
+    );
+
+    expect(part.tax).toBe(13);
+    expect(calculateWorkOrderTotals([part]).tax).toBe(13);
+  });
 });

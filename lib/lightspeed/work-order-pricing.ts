@@ -82,9 +82,10 @@ export function normalizeWorkOrderPricingLine(
   const discount =
     Math.abs(numberValue(line.calcDiscount ?? line.discountAmount)) ||
     discountValue(line.Discount, subtotal);
+  const aggregateTax = optionalNumber(line.calcTax);
   const calculatedTax =
-    numberValue(line.calcTax ?? line.calcTax1) +
-    numberValue(line.calcTax2);
+    aggregateTax ??
+    numberValue(line.calcTax1) + numberValue(line.calcTax2);
   const taxRate = rateValue(line.tax1Rate) + rateValue(line.tax2Rate);
   const tax =
     calculatedTax ||
