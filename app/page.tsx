@@ -14,16 +14,19 @@ import {
   Users,
 } from "lucide-react";
 
+const serif = "font-[Georgia,'Times_New_Roman',serif]";
+const pageWidth = "mx-auto w-[min(1040px,calc(100%-64px))] max-[760px]:w-[calc(100%-40px)]";
+
 const features = [
   {
     image: "/zoe-assets/calendar-product.png",
-    imageClass: "calendar-preview",
+    imagePosition: "object-[24%_center]",
     title: "See the whole shop at a glance",
     copy: "Give every mechanic a clear daily schedule. See each repair, customer, bicycle, status, and duration without jumping between systems.",
   },
   {
     image: "/zoe-assets/onboarding-product.png",
-    imageClass: "onboarding-preview",
+    imagePosition: "object-[47%_center]",
     title: "Get your team up and running",
     copy: "Create your shop, invite the team, set up your service calendar, and connect Lightspeed through one straightforward onboarding flow.",
   },
@@ -44,25 +47,25 @@ const capabilities = [
     icon: CalendarDays,
     title: "Visual service\ncalendar",
     copy: "Plan every repair by mechanic, time, and duration in one clear daily workspace.",
-    className: "capability black",
+    colors: "bg-[#1b214f] text-white",
   },
   {
     icon: Store,
     title: "Lightspeed\nintegration",
     copy: "Import work orders from Lightspeed Retail and keep live service details close at hand.",
-    className: "capability blue",
+    colors: "bg-[#92d7d9] text-[#1b214f]",
   },
   {
     icon: Users,
     title: "Mechanic workload\nmanagement",
     copy: "See who is available, move jobs between mechanics, and balance each day as priorities change.",
-    className: "capability white",
+    colors: "bg-[#d8c8f2] text-[#1b214f]",
   },
   {
     icon: LayoutDashboard,
     title: "One shared\nworkspace",
     copy: "Give owners and staff a reliable view of scheduled and unscheduled repair work.",
-    className: "capability orange",
+    colors: "bg-[#f8ddca] text-[#1b214f]",
   },
 ];
 
@@ -77,21 +80,53 @@ const faqs = [
   { q: "Can my whole team use it?", a: "Yes. Create a shop workspace, invite staff, and keep everyone working from the same live service schedule." },
 ];
 
-function Logo() {
+function Logo({ large = false }: { large?: boolean }) {
   return (
-    <a className="logo" href="#top" aria-label="Urbane Calendar home">
-      <span className="logo-mark"><i /><i /><i /><i /></span>
+    <a
+      className={`inline-flex flex-none items-center font-bold text-inherit no-underline ${serif} ${
+        large ? "gap-[9px] text-[21px] max-[760px]:text-[19px]" : "gap-2 text-sm"
+      }`}
+      href="#top"
+      aria-label="Urbane Calendar home"
+    >
+      <span
+        className={`relative grid place-content-center rounded-full bg-[#050505] ${
+          large
+            ? "size-10 grid-cols-[repeat(2,5px)] gap-1 max-[760px]:size-9 max-[760px]:gap-[3px]"
+            : "size-[27px] grid-cols-[repeat(2,4px)] gap-[3px]"
+        }`}
+      >
+        {[0, 1, 2, 3].map((item) => (
+          <i
+            className={`rounded-[1px] bg-white ${large ? "size-[5px]" : "size-1"}`}
+            key={item}
+          />
+        ))}
+      </span>
       <span>Urbane</span>
     </a>
   );
 }
 
-function EmailForm() {
+function EmailForm({ className = "" }: { className?: string }) {
   return (
-    <form className="email-form" onSubmit={(event) => event.preventDefault()}>
-      <Mail size={14} strokeWidth={1.7} />
-      <input aria-label="Email address" type="email" placeholder="Enter email address" />
-      <button type="submit">Start Free</button>
+    <form
+      className={`flex h-[34px] w-[258px] items-center rounded-[20px] bg-white py-[3px] pl-[10px] pr-[3px] shadow-[0_2px_4px_rgb(0_0_0/14%)] ${className}`}
+      onSubmit={(event) => event.preventDefault()}
+    >
+      <Mail className="shrink-0" size={14} strokeWidth={1.7} />
+      <input
+        className="ml-2 min-w-0 flex-1 border-0 bg-transparent text-[10px] outline-none"
+        aria-label="Email address"
+        type="email"
+        placeholder="Enter email address"
+      />
+      <button
+        className="h-7 cursor-pointer whitespace-nowrap rounded-2xl border-0 bg-black px-3.5 text-[9px] text-white"
+        type="submit"
+      >
+        Start Free
+      </button>
     </form>
   );
 }
@@ -108,111 +143,127 @@ export default function Home() {
   }, []);
 
   return (
-    <main id="top" className="zoe-page">
-      <nav className={`nav-pill ${navScrolled ? "scrolled" : ""}`} aria-label="Main navigation">
-        <Logo />
-        <div className="nav-links">
-          <a href="#categories">Categories</a>
-          <a href="#capabilities">Capabilities</a>
-          <a href="#faq">FAQ</a>
+    <main
+      id="top"
+      className="min-h-screen overflow-x-clip bg-[#faf6ea] font-[Arial,Helvetica,sans-serif] text-sm text-[#070707] [&_p]:leading-normal"
+    >
+      <nav
+        className={`sticky top-4 z-50 mt-[18px] flex min-h-[50px] w-[min(650px,calc(100%-48px))] items-center rounded-full border px-1.5 py-[5px] pl-3 transition-[background-color,border-color,box-shadow] duration-200 max-[760px]:min-h-12 max-[760px]:justify-between max-[480px]:top-2.5 max-[480px]:w-[calc(100%-28px)] ${
+          navScrolled
+            ? "border-white/60 bg-white/60 shadow-[0_12px_32px_rgb(34_30_12/16%),inset_0_1px_0_rgb(255_255_255/72%)] backdrop-blur-[18px] backdrop-saturate-[1.55]"
+            : "border-black/[.04] bg-white shadow-[0_10px_28px_rgb(78_64_9/14%)]"
+        } mx-auto`}
+        aria-label="Main navigation"
+      >
+        <Logo large />
+        <div className="flex w-full justify-center gap-7 max-[760px]:hidden">
+          <a className="text-[13px] text-inherit no-underline" href="#categories">Categories</a>
+          <a className="text-[13px] text-inherit no-underline" href="#capabilities">Capabilities</a>
+          <a className="text-[13px] text-inherit no-underline" href="#faq">FAQ</a>
         </div>
-        <div className="nav-actions">
-          <a className="nav-login" href="/auth/login">Login</a>
-          <a className="nav-signup" href="/auth/sign-up">Sign Up</a>
+        <div className="flex flex-none items-center gap-[7px]">
+          <a className="flex-none rounded-full bg-[#f2f2ef] px-[17px] py-3 text-xs text-[#111] no-underline max-[480px]:hidden" href="/auth/login">Login</a>
+          <a className="flex-none rounded-full bg-black px-[17px] py-3 text-xs text-white no-underline" href="/auth/sign-up">Sign Up</a>
         </div>
       </nav>
 
-      <section id="about" className="hero-section">
-        <div className="hero-inner">
-          <div className="hero-copy">
-            <span className="eyebrow">Service scheduling for modern bike shops</span>
-            <h1>Your workshop,<br /><em>running on time.</em> <span className="mini-sun">✦</span></h1>
-            <p>Turn Lightspeed work orders into a clear, shared service schedule. Assign repairs, balance mechanic workloads, and keep every job moving.</p>
-            <EmailForm />
+      <section
+        id="about"
+        className="mx-auto -mt-[66px] min-h-[458px] w-[calc(100%-20px)] max-w-[1130px] rounded-[22px] bg-[radial-gradient(circle_at_78%_22%,rgb(255_255_255/58%),transparent_32%),linear-gradient(118deg,#efd9e7_0%,#f7e7ed_54%,#f9e5d6_100%)] pt-[66px] max-[760px]:min-h-0"
+      >
+        <div className="mx-auto grid min-h-[420px] w-[min(990px,calc(100%-48px))] grid-cols-[310px_1fr] items-center gap-12 pt-9 max-[760px]:grid-cols-1 max-[760px]:gap-[30px] max-[760px]:py-[85px] max-[760px]:text-center">
+          <div className="self-center">
+            <span className="mb-[13px] block text-[10px] font-bold uppercase tracking-[.08em] text-[#655d28]">Service scheduling for modern bike shops</span>
+            <h1 className={`mb-4 text-[40px] leading-none tracking-[-1.5px] max-[480px]:text-[34px] ${serif}`}>
+              Your workshop,<br /><em className="font-inherit">running on time.</em>{" "}
+              <span className="ml-1 inline-grid size-[30px] translate-y-[-5px] place-items-center rounded-full bg-gradient-to-br from-[#ffb36d] to-[#ff7552] font-[Arial,sans-serif] text-base text-white shadow-[0_0_0_5px_rgb(255_255_255/20%)]">✦</span>
+            </h1>
+            <p className="mb-4 max-w-[315px] text-xs max-[760px]:mx-auto">Turn Lightspeed work orders into a clear, shared service schedule. Assign repairs, balance mechanic workloads, and keep every job moving.</p>
+            <EmailForm className="max-[760px]:mx-auto" />
           </div>
-          <div className="hero-art-wrap">
-            <Image className="hero-art" src="/zoe-assets/calendar-product.png" alt="Service calendar showing scheduled work across a team" width={1110} height={673} priority />
+          <div className="rotate-[1.2deg] overflow-hidden rounded-[18px] border-[7px] border-white/70 bg-white shadow-[0_22px_40px_rgb(66_56_12/20%)] max-[760px]:mx-auto max-[760px]:w-[min(620px,100%)] max-[760px]:rotate-0">
+            <Image className="block h-auto w-full" src="/zoe-assets/calendar-product.png" alt="Service calendar showing scheduled work across a team" width={1110} height={673} priority />
           </div>
         </div>
       </section>
 
-      <section id="categories" className="why-section page-width">
-        <div className="section-heading">
-          <span><Heart size={14} fill="currentColor" /> How it works</span>
-          <h2>From work order to <em>workday</em></h2>
-          <p>Bring service work into one visual schedule so your front desk, mechanics, and customers always know what comes next.</p>
+      <section id="categories" className={`${pageWidth} pt-[77px]`}>
+        <div className="mx-auto mb-[30px] max-w-[520px] text-center">
+          <span className="inline-flex items-center gap-2 text-[11px]"><Heart className="text-[#ff9262]" size={14} fill="currentColor" /> How it works</span>
+          <h2 className={`my-2.5 mb-3.5 text-[29px] leading-none ${serif}`}>From work order to <em className="font-inherit">workday</em></h2>
+          <p className="m-0 text-[11px]">Bring service work into one visual schedule so your front desk, mechanics, and customers always know what comes next.</p>
         </div>
-        <div className="feature-grid">
+        <div className="grid grid-cols-2 gap-3 max-[760px]:grid-cols-1">
           {features.map((feature) => (
-            <article className="feature-card" key={feature.title}>
+            <article className="min-h-[320px] rounded-3xl bg-white px-[34px] pb-5 pt-[22px] text-center" key={feature.title}>
               {feature.image ? (
-                <Image className={feature.imageClass} src={feature.image} alt="" width={600} height={360} />
+                <Image className={`h-[185px] w-full rounded-[13px] object-cover shadow-[0_10px_24px_rgb(32_29_19/10%)] ${feature.imagePosition}`} src={feature.image} alt="" width={600} height={360} />
               ) : feature.icon ? (
-                <div className="feature-icon"><feature.icon size={56} strokeWidth={1.35} /></div>
+                <div className="grid h-[185px] w-full place-items-center rounded-[13px] bg-[radial-gradient(circle_at_center,rgb(255_141_78/33%),transparent_36%),#f7e7ed] text-[#171717]"><feature.icon size={56} strokeWidth={1.35} /></div>
               ) : null}
-              <h3>{feature.title}</h3>
-              <p>{feature.copy}</p>
+              <h3 className={`mb-2.5 mt-0.5 text-[15px] ${serif}`}>{feature.title}</h3>
+              <p className="mx-auto max-w-[310px] text-[11px]">{feature.copy}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section id="capabilities" className="capabilities-section page-width">
-        <div className="section-heading compact">
-          <h2>Everything your service desk needs</h2>
-          <p>Less time coordinating repairs. More time getting bikes back to their riders.</p>
+      <section id="capabilities" className={`${pageWidth} pt-[74px]`}>
+        <div className="mx-auto mb-[27px] max-w-[520px] text-center">
+          <h2 className={`mb-3 text-[29px] leading-none ${serif}`}>Everything your service desk needs</h2>
+          <p className="text-[11px]">Less time coordinating repairs. More time getting bikes back to their riders.</p>
         </div>
-        <div className="capability-grid">
+        <div className="grid grid-cols-4 gap-[11px] max-[760px]:grid-cols-2 max-[480px]:grid-cols-1">
           {capabilities.map(({ icon: Icon, ...item }) => (
-            <article className={item.className} key={item.title}>
+            <article className={`flex min-h-72 flex-col justify-between rounded-2xl px-4 pb-4 pt-5 ${item.colors}`} key={item.title}>
               <Icon size={52} strokeWidth={1.25} />
               <div>
-                <h3>{item.title.split("\n").map((line) => <span key={line}>{line}<br /></span>)}</h3>
-                <p>{item.copy}</p>
+                <h3 className={`mb-2.5 text-base leading-[1.1] ${serif}`}>{item.title.split("\n").map((line) => <span key={line}>{line}<br /></span>)}</h3>
+                <p className="text-[11px] leading-[1.45]">{item.copy}</p>
               </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section id="faq" className="faq-section page-width">
-        <div className="faq-intro">
-          <span><Heart size={14} fill="currentColor" /> FAQ</span>
-          <h2>We’ve got<br />the <em>answers</em></h2>
-          <p>Everything you need to know before bringing your workshop schedule into Urbane.</p>
+      <section id="faq" className={`${pageWidth} grid grid-cols-[280px_1fr] gap-[85px] pt-[78px] max-[760px]:grid-cols-1 max-[760px]:gap-[30px]`}>
+        <div className="max-[760px]:text-center">
+          <span className="inline-flex items-center gap-2 text-[11px]"><Heart className="text-[#ff9262]" size={14} fill="currentColor" /> FAQ</span>
+          <h2 className={`mb-4 mt-[13px] text-[29px] leading-[.95] ${serif}`}>We’ve got<br />the <em className="font-inherit">answers</em></h2>
+          <p className="max-w-[220px] text-[11px] max-[760px]:mx-auto">Everything you need to know before bringing your workshop schedule into Urbane.</p>
         </div>
-        <div className="accordion">
+        <div className="flex flex-col gap-[9px]">
           {faqs.map((faq, index) => {
             const open = openFaq === index;
             return (
-              <article className={`faq-item ${open ? "open" : ""}`} key={faq.q}>
-                <button onClick={() => setOpenFaq(open ? -1 : index)} aria-expanded={open}>
+              <article className={`overflow-hidden rounded-[14px] shadow-[0_5px_14px_rgb(99_75_27/5%)] ${open ? "bg-[#050505] text-white" : "bg-white"}`} key={faq.q}>
+                <button className={`flex w-full cursor-pointer items-center justify-between border-0 bg-transparent px-5 py-4 text-left text-[15px] font-semibold text-inherit ${serif}`} onClick={() => setOpenFaq(open ? -1 : index)} aria-expanded={open}>
                   <span>{faq.q}</span>
-                  {open ? <ArrowUp size={14} /> : <ChevronDown size={14} />}
+                  <span className="box-content flex-none rounded-full bg-[#f8f8f8] p-0.5 text-[#111]">{open ? <ArrowUp size={14} /> : <ChevronDown size={14} />}</span>
                 </button>
-                {open && <p>{faq.a}</p>}
+                {open && <p className="-mt-[5px] mb-[19px] ml-5 mr-5 max-w-[390px] whitespace-pre-line text-[10px]">{faq.a}</p>}
               </article>
             );
           })}
         </div>
       </section>
 
-      <section id="access" className="access-section page-width">
-        <h2>Build a calmer,<br /><em>more productive workshop.</em></h2>
-        <p>Start organizing your service day in minutes.</p>
-        <EmailForm />
+      <section id="access" className={`${pageWidth} mt-[78px] rounded-[18px] bg-[linear-gradient(118deg,#efd9e7,#f9e5d6)] px-5 pb-11 pt-[51px] text-center`}>
+        <h2 className={`mb-2 text-[25px] leading-[1.1] ${serif}`}>Build a calmer,<br /><em className="font-inherit">more productive workshop.</em></h2>
+        <p className="mb-[22px] text-[11px]">Start organizing your service day in minutes.</p>
+        <EmailForm className="mx-auto" />
       </section>
 
-      <footer className="footer page-width">
-        <div className="footer-top">
+      <footer className={`${pageWidth} pb-3.5 pt-[39px]`}>
+        <div className="flex items-center justify-between max-[480px]:flex-col max-[480px]:items-start max-[480px]:gap-[22px]">
           <Logo />
-          <nav>
-            <a href="#categories">How it works</a><a href="#capabilities">Capabilities</a><a href="#faq">FAQ</a><a href="/auth/login">Login</a><a href="/auth/sign-up">Sign Up</a>
+          <nav className="flex gap-[30px] text-[10px] max-[480px]:flex-wrap max-[480px]:gap-x-6 max-[480px]:gap-y-4">
+            <a className="text-inherit no-underline" href="#categories">How it works</a><a className="text-inherit no-underline" href="#capabilities">Capabilities</a><a className="text-inherit no-underline" href="#faq">FAQ</a><a className="text-inherit no-underline" href="/auth/login">Login</a><a className="text-inherit no-underline" href="/auth/sign-up">Sign Up</a>
           </nav>
         </div>
-        <div className="footer-bottom">
+        <div className="mt-7 flex items-center justify-between border-t border-[#eee8d8] pt-5 text-[9px] max-[480px]:flex-col max-[480px]:items-start max-[480px]:gap-[22px]">
           <span>Copyright © 2026 Urbane Calendar. All rights reserved.</span>
-          <div><a href="#">Terms &amp; Conditions</a><a href="#">Privacy Policy</a></div>
+          <div className="flex gap-[34px]"><a className="text-inherit underline" href="#">Terms &amp; Conditions</a><a className="text-inherit underline" href="#">Privacy Policy</a></div>
         </div>
       </footer>
     </main>
