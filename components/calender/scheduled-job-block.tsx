@@ -2,6 +2,8 @@ import { useDraggable } from "@dnd-kit/core";
 import type { ScheduledJob } from "@/lib/database/calendar";
 import type { JobCardData } from "@/components/calender/job-card-content";
 import { JobCardContent } from "@/components/calender/job-card-content";
+import { getStatusPalette } from "./status-colors";
+import { cn } from "@/lib/utils";
 
 export function ScheduledJobBlock({
   scheduledJob,
@@ -25,6 +27,7 @@ export function ScheduledJobBlock({
 
   const topPosition = scheduledJob.time_slot * 20;
   const height = scheduledJob.job.duration * 4 * 20;
+  const palette = getStatusPalette(cardData.status);
 
   return (
     <div
@@ -36,7 +39,12 @@ export function ScheduledJobBlock({
       }}
       {...listeners}
       {...attributes}
-      className={`absolute left-1 right-1 overflow-hidden rounded-lg border border-blue-200 border-l-4 border-l-blue-500 bg-white p-2 cursor-move shadow-sm transition-all hover:shadow-md ${isDragging ? "opacity-50 z-50" : ""}`}
+      className={cn(
+        "absolute left-1 right-1 cursor-move overflow-hidden rounded-sm border border-l-4 p-2 shadow-sm transition-all hover:saturate-[1.35] hover:shadow-md",
+        palette.card,
+        palette.accent,
+        isDragging && "z-50 opacity-50",
+      )}
       onContextMenu={(e) => {
         e.preventDefault();
         onRemove();

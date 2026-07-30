@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/accordion";
 import { DraggableWorkOrder } from "./draggable-work-order";
 import { DatePicker } from "./date-picker";
+import { getStatusPalette } from "./status-colors";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 // ---------------------------------------------------------------------------
@@ -173,13 +174,13 @@ export function JobsPanel({
   return (
     <div
       ref={setNodeRef}
-      className="relative w-[30%] flex-shrink-0 bg-white border-l shadow-lg flex flex-col h-full pt-6"
+      className="relative flex h-full w-[30%] flex-shrink-0 flex-col overflow-hidden border-l border-[#d9dce6] bg-[#fafbfc] pt-5"
     >
       {isOver && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-blue-50/85 p-5 backdrop-blur-[1px]">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[#f7e7ed]/90 p-5 backdrop-blur-[1px]">
           <div className="w-full max-w-[240px] rounded-2xl bg-white/95 p-6 text-center shadow-xl shadow-blue-950/10">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-              <CalendarMinus className="h-6 w-6 text-blue-700" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#f9e5d6]">
+              <CalendarMinus className="h-6 w-6 text-[#a75f56]" />
             </div>
             <p className="text-base font-semibold text-slate-900">
               Drop to unschedule
@@ -189,10 +190,10 @@ export function JobsPanel({
       )}
 
       {/* Header */}
-      <div className="px-4 pb-4 border-b space-y-3">
+      <div className="space-y-3 border-b border-[#d9dce6] bg-white px-4 pb-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Work Orders</h2>
-          <Badge variant="outline">{workOrders.length}</Badge>
+          <h2 className="text-xl font-semibold text-[#242426]">Work Orders</h2>
+          <Badge variant="outline" className="rounded-full border-[#d9dce6] bg-[#f4f5f7]">{workOrders.length}</Badge>
         </div>
 
         {/* Date navigation */}
@@ -201,7 +202,7 @@ export function JobsPanel({
             variant="outline"
             size="sm"
             onClick={() => onNavigateDate("prev")}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 border-[#d9dce6] bg-[#f1f2f6] p-0"
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -209,7 +210,7 @@ export function JobsPanel({
             variant="outline"
             size="sm"
             onClick={() => setShowInlineDatePicker(!showInlineDatePicker)}
-            className="flex-1 justify-start text-left h-8 px-2 text-xs"
+            className="h-8 flex-1 justify-start border-[#d9dce6] px-2 text-left text-xs"
           >
             <CalendarIcon className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" />
             <span className="truncate">{formatDate(currentDate)}</span>
@@ -218,7 +219,7 @@ export function JobsPanel({
             variant="outline"
             size="sm"
             onClick={() => onNavigateDate("next")}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 border-[#d9dce6] bg-[#f1f2f6] p-0"
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
@@ -227,7 +228,7 @@ export function JobsPanel({
               variant="outline"
               size="sm"
               onClick={onGoToToday}
-              className="h-8 text-xs hover:bg-blue-50 hover:text-blue-700"
+              className="h-8 border-[#d9dce6] text-xs hover:bg-[#f6f7f9]"
             >
               Today
             </Button>
@@ -236,7 +237,7 @@ export function JobsPanel({
 
         {/* Inline date picker */}
         {showInlineDatePicker && (
-          <div className="p-3 bg-white border rounded-lg shadow-sm">
+          <div className="rounded-2xl border border-[#e9e2d3] bg-[#fffdf8] p-3 shadow-sm">
             <DatePicker
               selectedDate={currentDate}
               onDateSelect={(date) => {
@@ -255,7 +256,7 @@ export function JobsPanel({
             placeholder="Search work orders..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 h-9 text-sm"
+            className="h-9 border-[#d9dce6] bg-[#f8f9fb] pl-8 text-sm focus-visible:ring-[#777b95]"
           />
         </div>
       </div>
@@ -304,17 +305,19 @@ export function JobsPanel({
           >
             {effectiveCategories.map((category) => {
               const jobs = filtered.grouped[category] || [];
+              const palette = getStatusPalette(category);
               // Hide empty categories — always when searching, also when not searching
               if (jobs.length === 0) return null;
 
               return (
                 <AccordionItem key={category} value={category}>
-                  <AccordionTrigger className="px-2 text-sm font-semibold text-gray-700 hover:no-underline">
+                  <AccordionTrigger className="px-2 text-sm font-semibold text-[#30334f] hover:no-underline">
                     <span className="flex items-center gap-2">
+                      <span className={`size-2.5 rounded-full ${palette.dot}`} />
                       {category}
                       <Badge
                         variant="secondary"
-                        className="text-xs px-1.5 py-0 h-5"
+                        className={`h-5 rounded-full px-1.5 py-0 text-xs ${palette.badge}`}
                       >
                         {jobs.length}
                       </Badge>

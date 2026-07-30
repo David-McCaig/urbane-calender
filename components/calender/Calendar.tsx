@@ -49,7 +49,7 @@ export default function Calendar() {
   // Loading state — shop context still resolving
   if (shopLoading) {
     return (
-      <div className="h-[calc(100vh-3.5rem)] bg-gray-50 flex">
+      <div className="flex h-[calc(100vh-4rem)] bg-[#f5f3ef]">
         <div className="w-[70%] flex-shrink-0">
           <main className="p-6">
             <CalendarGridSkeleton />
@@ -62,16 +62,16 @@ export default function Calendar() {
   // No shop set up
   if (!activeShop) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Shop Set Up</h2>
-          <p className="text-gray-600 mb-4">
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-[#f5f3ef] p-6">
+        <div className="max-w-md rounded-2xl border bg-white p-10 text-center shadow-sm">
+          <AlertCircle className="mx-auto mb-4 size-12 text-[#8589a3]" />
+          <h2 className="mb-2 font-[Georgia,'Times_New_Roman',serif] text-2xl font-semibold">No shop set up</h2>
+          <p className="mb-5 text-sm text-[#655f55]">
             You need to create or join a shop before you can use the calendar.
           </p>
           <a
             href="/onboarding"
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center rounded-md bg-[#1c1c1e] px-5 py-2.5 text-sm text-white transition-opacity hover:opacity-90"
           >
             Set Up Your Shop
           </a>
@@ -87,7 +87,7 @@ export default function Calendar() {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="h-[calc(100vh-3.5rem)] bg-gray-50 flex">
+      <div className="flex h-[calc(100vh-4rem)] bg-[#f5f3ef]">
         <CalendarGrid
           mechanics={mechanics}
           scheduledJobs={scheduledJobs}
@@ -121,11 +121,11 @@ export default function Calendar() {
 
         <DragOverlay>
           {activeDragOverlay ? (
-            <div className="p-3 bg-blue-100 border-2 border-blue-300 rounded-lg shadow-lg">
-              <div className="font-medium text-sm text-blue-900">
+            <div className="rounded-2xl border-2 border-[#e9a48b] bg-[#f9e5d6] p-3 shadow-lg">
+              <div className="text-sm font-medium text-[#452c27]">
                 {activeDragOverlay.title}
               </div>
-              <div className="text-xs text-blue-700">
+              <div className="text-xs text-[#8b594e]">
                 {activeDragOverlay.subtitle}
               </div>
             </div>

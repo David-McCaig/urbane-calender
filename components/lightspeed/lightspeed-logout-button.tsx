@@ -8,6 +8,7 @@ export function LightspeedLogoutButton() {
     <Button
       variant="outline"
       size="default"
+      className="border-white/20 bg-transparent text-white/80 hover:bg-white/10 hover:text-white"
       onClick={() => logoutLightspeed()}
     >
       Lightspeed Logout
