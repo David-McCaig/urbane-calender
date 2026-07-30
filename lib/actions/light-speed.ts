@@ -168,15 +168,23 @@ function normalizeSaleLine(
   value: unknown,
   index: number,
   kindOverride?: LightspeedWorkOrderLine["kind"],
+  serviceRate = 0,
 ): LightspeedWorkOrderLine {
   const line = asRecord(value);
   const item = asRecord(line.Item);
   const quantity = numberValue(line.unitQuantity ?? line.quantity) || 1;
   const kind = kindOverride || lineKind(line);
+  const durationMinutes =
+    numberValue(line.hours) * 60 + numberValue(line.minutes);
+  const timedLabourPrice =
+    kind === "labour" && durationMinutes > 0
+      ? Math.round(serviceRate * (durationMinutes / 60) * 100) / 100
+      : 0;
   const baseUnitPrice =
     kind === "labour" || kind === "fee"
       ? numberValue(line.unitPriceOverride) ||
         numberValue(line.unitPrice) ||
+        timedLabourPrice ||
         numberValue(line.unitCost)
       : numberValue(line.unitPrice ?? line.amount);
   const subtotal =
@@ -202,8 +210,6 @@ function normalizeSaleLine(
     Math.max(0, subtotal - discount + tax);
   const isComplete = booleanValue(line.done);
   const isSpecialOrder = booleanValue(line.isSpecialOrder);
-  const durationMinutes =
-    numberValue(line.hours) * 60 + numberValue(line.minutes);
 
   return {
     id: String(
@@ -253,8 +259,9 @@ function normalizeSaleLine(
 function normalizeWorkOrderLine(
   value: unknown,
   index: number,
+  serviceRate: number,
 ): LightspeedWorkOrderLine {
-  return normalizeSaleLine(value, index, "labour");
+  return normalizeSaleLine(value, index, "labour", serviceRate);
 }
 
 async function fetchLightspeedJson(
@@ -687,7 +694,11 @@ export async function getWorkOrderDetails(
     const workOrderLineRelations = encodeURIComponent(
       '["Item","Employee","Discount","TaxClass"]',
     );
-    const [itemsJson, labourJson] = await Promise.all([
+    const lightspeedShopId = String(workOrderRecord.shopID ?? "");
+    const lightspeedShopUrl =
+      `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
+      `/Shop/${encodeURIComponent(lightspeedShopId)}.json`;
+    const [itemsJson, labourJson, shopJson] = await Promise.all([
       fetchLightspeedJson(
         `${workOrderBaseUrl}/WorkorderItem.json?load_relations=${itemRelations}`,
         token,
@@ -696,7 +707,12 @@ export async function getWorkOrderDetails(
         `${workOrderBaseUrl}/WorkorderLine.json?load_relations=${workOrderLineRelations}`,
         token,
       ),
+      lightspeedShopId
+        ? fetchLightspeedJson(lightspeedShopUrl, token)
+        : Promise.resolve(null),
     ]);
+    const lightspeedShop = responseRecord(shopJson, "Shop");
+    const serviceRate = numberValue(lightspeedShop.serviceRate);
 
     const embeddedItems = relationArray(
       workOrderRecord,
@@ -753,7 +769,7 @@ export async function getWorkOrderDetails(
       normalizeSaleLine(line, index, "part"),
     );
     const labour = enrichedLines.map((line, index) =>
-      normalizeWorkOrderLine(line, index),
+      normalizeWorkOrderLine(line, index, serviceRate),
     );
     lines = [...labour, ...parts];
 
@@ -793,15 +809,7 @@ export async function getWorkOrderDetails(
     // tax from the shop configuration, so do not gate this fallback on that
     // field. Prefer calculated line/sale tax above whenever it exists.
     if (tax === 0) {
-      const shopId = String(workOrderRecord.shopID ?? "");
       const customer = asRecord(workOrderRecord.Customer);
-      const shopUrl =
-        `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
-        `/Shop/${encodeURIComponent(shopId)}.json`;
-      const shopJson = shopId
-        ? await fetchLightspeedJson(shopUrl, token)
-        : null;
-      const lightspeedShop = responseRecord(shopJson, "Shop");
       const taxCategoryId = firstNonZeroId(
         saleRecord.taxCategoryID,
         customer.taxCategoryID,
