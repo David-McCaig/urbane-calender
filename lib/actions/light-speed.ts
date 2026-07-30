@@ -175,7 +175,9 @@ function normalizeSaleLine(
   const kind = kindOverride || lineKind(line);
   const baseUnitPrice =
     kind === "labour" || kind === "fee"
-      ? numberValue(line.unitPriceOverride) || numberValue(line.unitCost)
+      ? numberValue(line.unitPriceOverride) ||
+        numberValue(line.unitPrice) ||
+        numberValue(line.unitCost)
       : numberValue(line.unitPrice ?? line.amount);
   const subtotal =
     numberValue(line.calcSubtotal ?? line.subtotal) ||
@@ -252,14 +254,7 @@ function normalizeWorkOrderLine(
   value: unknown,
   index: number,
 ): LightspeedWorkOrderLine {
-  const line = asRecord(value);
-  const item = asRecord(line.Item);
-  const searchable = [line.note, line.description, item.description]
-    .filter((entry): entry is string => typeof entry === "string")
-    .join(" ")
-    .toLowerCase();
-  const kind = /fee|misc|charge|shipping/.test(searchable) ? "fee" : "labour";
-  return normalizeSaleLine(value, index, kind);
+  return normalizeSaleLine(value, index, "labour");
 }
 
 async function fetchLightspeedJson(
