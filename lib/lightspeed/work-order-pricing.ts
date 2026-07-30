@@ -16,6 +16,12 @@ function numberValue(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function optionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function booleanValue(value: unknown): boolean {
   return value === true || value === "true" || value === "1" || value === 1;
 }
@@ -50,7 +56,9 @@ export function normalizeWorkOrderPricingLine(
 ): LightspeedWorkOrderLine {
   const line = asRecord(value);
   const item = asRecord(line.Item);
-  const quantity = numberValue(line.unitQuantity ?? line.quantity) || 1;
+  const parsedQuantity = optionalNumber(line.unitQuantity ?? line.quantity);
+  const quantity =
+    parsedQuantity !== null && parsedQuantity >= 0 ? parsedQuantity : 1;
   const kind = kindOverride ?? "part";
   const durationMinutes =
     numberValue(line.hours) * 60 + numberValue(line.minutes);
@@ -65,10 +73,12 @@ export function normalizeWorkOrderPricingLine(
         timedLabourPrice ||
         numberValue(line.unitCost)
       : numberValue(line.unitPrice ?? line.amount);
-  const subtotal =
-    numberValue(line.calcSubtotal ?? line.subtotal) ||
-    quantity * baseUnitPrice;
-  const unitPrice = baseUnitPrice || subtotal / quantity;
+  const calculatedSubtotal = optionalNumber(
+    line.calcSubtotal ?? line.subtotal,
+  );
+  const subtotal = calculatedSubtotal ?? quantity * baseUnitPrice;
+  const unitPrice =
+    baseUnitPrice || (quantity > 0 ? subtotal / quantity : 0);
   const discount =
     Math.abs(numberValue(line.calcDiscount ?? line.discountAmount)) ||
     discountValue(line.Discount, subtotal);
@@ -81,9 +91,9 @@ export function normalizeWorkOrderPricingLine(
     (booleanValue(line.tax)
       ? Math.round(Math.max(0, subtotal - discount) * taxRate * 100) / 100
       : 0);
+  const calculatedTotal = optionalNumber(line.calcTotal ?? line.total);
   const total =
-    numberValue(line.calcTotal ?? line.total) ||
-    Math.max(0, subtotal - discount + tax);
+    calculatedTotal ?? Math.max(0, subtotal - discount + tax);
   const isComplete = booleanValue(line.done);
   const isSpecialOrder = booleanValue(line.isSpecialOrder);
   const description =

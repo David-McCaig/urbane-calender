@@ -204,6 +204,16 @@ async function fetchLightspeedJson(
   });
 
   logLightspeedRateLimitHeaders(response);
+  if (
+    response.status === 401 ||
+    response.status === 403 ||
+    response.status === 429 ||
+    response.status >= 500
+  ) {
+    throw new Error(
+      `Lightspeed dependency request failed with status ${response.status}`,
+    );
+  }
   if (!response.ok) return null;
   return (await response.json()) as LightspeedRecord;
 }

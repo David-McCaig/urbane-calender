@@ -57,6 +57,26 @@ describe("normalizeWorkOrderPricingLine", () => {
     expect(line.kind).toBe("fee");
     expect(line.subtotal).toBe(25);
   });
+
+  it("preserves explicit zero quantities and calculated totals", () => {
+    const line = normalizeWorkOrderPricingLine(
+      {
+        unitQuantity: "0",
+        unitPrice: "125",
+        calcSubtotal: "0",
+        calcTotal: "0",
+      },
+      0,
+      "part",
+    );
+
+    expect(line).toMatchObject({
+      quantity: 0,
+      unitPrice: 125,
+      subtotal: 0,
+      total: 0,
+    });
+  });
 });
 
 describe("calculateWorkOrderTotals", () => {
