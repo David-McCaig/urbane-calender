@@ -122,6 +122,14 @@ function rateValue(value: unknown): number {
   return rate > 1 ? rate / 100 : rate;
 }
 
+function responseRecord(
+  response: LightspeedRecord | null,
+  name: string,
+): LightspeedRecord {
+  const value = response?.[name];
+  return asRecord(Array.isArray(value) ? value[0] : value);
+}
+
 function employeeName(value: unknown): string {
   const employee = asRecord(value);
   return [employee.firstName, employee.lastName]
@@ -746,16 +754,13 @@ export async function getWorkOrderDetails(
     );
     lines = [...labour, ...parts];
 
-    if (saleId) {
+    if (saleId && saleId !== "0") {
       const saleRelations = encodeURIComponent('["Employee"]');
       const saleUrl =
         `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
         `/Sale/${encodeURIComponent(saleId)}.json?load_relations=${saleRelations}`;
       const saleJson = await fetchLightspeedJson(saleUrl, token);
-      const saleValue = saleJson?.Sale;
-      saleRecord = asRecord(
-        Array.isArray(saleValue) ? saleValue[0] : saleValue,
-      );
+      saleRecord = responseRecord(saleJson, "Sale");
     }
 
     const categoryTotal = (kind: LightspeedWorkOrderLine["kind"]) =>
@@ -773,11 +778,64 @@ export async function getWorkOrderDetails(
       subtotal,
     );
     const discounts = workOrderDiscount || lineDiscounts;
-    const tax =
+    let tax =
       lineTax ||
       numberValue(saleRecord.calcTax) ||
       numberValue(saleRecord.calcTax1) + numberValue(saleRecord.calcTax2) ||
       0;
+
+    // Open work orders often have no calculated Sale tax yet. Workorder.tax
+    // only indicates whether tax applies; the rates live on the applicable
+    // TaxCategory (sale/customer override, then the shop default).
+    if (tax === 0 && booleanValue(workOrderRecord.tax)) {
+      const shopId = String(workOrderRecord.shopID ?? "");
+      const customer = asRecord(workOrderRecord.Customer);
+      const shopUrl =
+        `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
+        `/Shop/${encodeURIComponent(shopId)}.json`;
+      const shopJson = shopId
+        ? await fetchLightspeedJson(shopUrl, token)
+        : null;
+      const lightspeedShop = responseRecord(shopJson, "Shop");
+      const taxCategoryId = String(
+        saleRecord.taxCategoryID ||
+          customer.taxCategoryID ||
+          lightspeedShop.taxCategoryID ||
+          "",
+      );
+
+      if (taxCategoryId && taxCategoryId !== "0") {
+        const taxCategoryUrl =
+          `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
+          `/TaxCategory/${encodeURIComponent(taxCategoryId)}.json`;
+        const taxCategoryJson = await fetchLightspeedJson(
+          taxCategoryUrl,
+          token,
+        );
+        const taxCategory = responseRecord(
+          taxCategoryJson,
+          "TaxCategory",
+        );
+        const fallbackRate =
+          rateValue(taxCategory.tax1Rate) +
+          rateValue(taxCategory.tax2Rate);
+
+        if (fallbackRate > 0) {
+          const taxLabour = booleanValue(lightspeedShop.taxLabor);
+          const taxableSubtotal = lines.reduce((sum, line) => {
+            if (line.kind === "labour" && !taxLabour) return sum;
+            return sum + Math.max(0, line.subtotal - line.discount);
+          }, 0);
+          const taxableAfterWorkOrderDiscount = Math.max(
+            0,
+            taxableSubtotal - Math.max(0, workOrderDiscount - lineDiscounts),
+          );
+          tax =
+            Math.round(taxableAfterWorkOrderDiscount * fallbackRate * 100) /
+            100;
+        }
+      }
+    }
 
     const details: LightspeedWorkOrderDetails = {
       ...workOrder,
