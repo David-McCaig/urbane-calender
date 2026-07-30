@@ -71,12 +71,12 @@ export function CalendarGrid({
   };
 
   return (
-    <div className="w-[70%] flex-shrink-0">
+    <div className="w-[70%] flex-shrink-0 overflow-hidden bg-white">
       <main className="p-6">
         {/* Date and Controls */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <h1 className="text-xl font-semibold tracking-[.04em] text-[#242426]">
               {currentDate.toDateString() === new Date().toDateString()
                 ? "TODAY"
                 : "SCHEDULE"}
@@ -86,14 +86,14 @@ export function CalendarGrid({
                 variant="outline"
                 size="sm"
                 onClick={() => onNavigateDate("prev")}
-                className="hover:bg-gray-100"
+                className="border-[#d9dce6] bg-[#f1f2f6] hover:bg-[#e8eaf0]"
               >
                 ←
               </Button>
               <Button
                 variant="outline"
                 onClick={onToggleDatePicker}
-                className="min-w-[200px] justify-start text-left hover:bg-gray-50"
+                className="min-w-[200px] justify-start border-[#d9dce6] bg-white text-left hover:bg-[#f6f7f9]"
               >
                 <CalendarIcon className="w-4 h-4 mr-2" />
                 {formatDate(currentDate)}
@@ -102,7 +102,7 @@ export function CalendarGrid({
                 variant="outline"
                 size="sm"
                 onClick={() => onNavigateDate("next")}
-                className="hover:bg-gray-100"
+                className="border-[#d9dce6] bg-[#f1f2f6] hover:bg-[#e8eaf0]"
               >
                 →
               </Button>
@@ -110,7 +110,7 @@ export function CalendarGrid({
                 variant="outline"
                 size="sm"
                 onClick={onGoToToday}
-                className="ml-2 text-xs hover:bg-blue-50 hover:text-blue-700"
+                className="ml-2 border-[#d9dce6] bg-white text-xs hover:bg-[#f6f7f9]"
               >
                 Today
               </Button>
@@ -120,18 +120,18 @@ export function CalendarGrid({
           <div className="flex items-center space-x-4">
             <Button
               variant="outline"
-              className="flex items-center space-x-2 bg-transparent"
+              className="flex items-center space-x-2 border-[#d9dce6] bg-white"
             >
               <span>FILTERS</span>
             </Button>
-            <div className="flex bg-white border rounded-lg">
+            <div className="flex rounded-md border border-[#242426] bg-white">
               <Button
                 variant="default"
-                className="bg-slate-800 text-white hover:bg-slate-700"
+                className="rounded-none bg-[#242426] text-white hover:bg-[#343438]"
               >
                 DAY
               </Button>
-              <Button variant="ghost" className="text-gray-600">
+              <Button variant="ghost" className="rounded-none text-[#242426]">
                 WEEK
               </Button>
             </div>
@@ -139,11 +139,11 @@ export function CalendarGrid({
         </div>
 
         {/* Scheduler Grid */}
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden relative">
+        <div className="relative overflow-hidden border border-[#d9dce6] bg-white">
           {/* Header Row */}
           <div className="flex border-b">
-            <div className="w-20 p-4 bg-gray-50 border-r flex-shrink-0">
-              <span className="text-sm font-medium text-gray-600">TIME</span>
+            <div className="w-20 flex-shrink-0 border-r border-[#d9dce6] bg-white p-4">
+              <span className="text-xs font-bold tracking-[.08em] text-[#777b95]">TIME</span>
             </div>
 
             <div
@@ -153,11 +153,11 @@ export function CalendarGrid({
               {mechanics.map((mechanic) => (
                 <div
                   key={mechanic.id}
-                  className="min-w-[192px] flex-1 p-4 bg-gray-50 border-r last:border-r-0"
+                  className="min-w-[192px] flex-1 border-r border-[#d9dce6] bg-white p-4 last:border-r-0"
                 >
                   <div className="flex items-center space-x-3">
                     <Avatar className="w-10 h-10">
-                      <AvatarFallback className="bg-blue-100 text-blue-700 font-medium">
+                      <AvatarFallback className="bg-[#eeeafe] font-medium text-[#565083]">
                         {mechanic.avatar}
                       </AvatarFallback>
                     </Avatar>
@@ -178,7 +178,7 @@ export function CalendarGrid({
           {/* Content Row */}
           <div className="flex">
             {/* Time slots column */}
-            <div className="w-20 border-r bg-gray-50/50 flex-shrink-0">
+            <div className="w-20 flex-shrink-0 border-r border-[#d9dce6] bg-[#fafbfc]">
               {Array.from({ length: 32 }, (_, index) => {
                 const totalMinutes = 10 * 60 + index * 15;
                 const hour = Math.floor(totalMinutes / 60);
@@ -223,7 +223,7 @@ export function CalendarGrid({
                     <DropZone
                       key={timeIndex}
                       id={`slot-${mechanicIndex}-${timeIndex}`}
-                      className="h-5 border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors relative"
+                      className="relative h-5 border-b border-[#eaecf1] bg-white transition-colors hover:bg-[#f8f9fb]"
                     />
                   ))}
 
@@ -272,10 +272,10 @@ export function CalendarGrid({
 
         {/* Date Picker Modal */}
         {showDatePicker && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-80">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-sm">
+            <div className="w-80 rounded-3xl border border-white/70 bg-[#fffdf8] p-6 shadow-2xl">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="font-[Georgia,'Times_New_Roman',serif] text-xl font-semibold">
                   Select Date
                 </h2>
                 <Button

@@ -72,7 +72,7 @@ export function DatePicker({ selectedDate, onDateSelect }: DatePickerProps) {
         >
           ←
         </Button>
-        <h3 className="text-lg font-semibold">
+        <h3 className="font-[Georgia,'Times_New_Roman',serif] text-lg font-semibold">
           {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
         </h3>
         <Button
@@ -104,9 +104,9 @@ export function DatePicker({ selectedDate, onDateSelect }: DatePickerProps) {
               variant={isSelected(date) ? "default" : "ghost"}
               size="sm"
               onClick={() => onDateSelect(date)}
-              className={`h-8 w-8 p-0 text-sm ${
+              className={`h-8 w-8 rounded-full p-0 text-sm ${
                 isToday(date) && !isSelected(date)
-                  ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  ? "bg-[#f9e5d6] text-[#9b5949] hover:bg-[#f3d5c8]"
                   : ""
               }`}
             >

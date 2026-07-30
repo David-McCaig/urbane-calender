@@ -17,7 +17,7 @@ export function ShopSwitcher() {
 
   if (isLoading) {
     return (
-      <div className="h-9 w-44 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-md" />
+      <div className="h-9 w-44 animate-pulse rounded-md bg-white/15" />
     );
   }
 
@@ -27,7 +27,7 @@ export function ShopSwitcher() {
 
   if (!activeShop) {
     return (
-      <Button variant="outline" className="gap-2" asChild>
+      <Button variant="outline" className="gap-2 border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" asChild>
         <a href="/onboarding">
           <Store className="h-4 w-4" />
           <span>Set up your shop</span>
@@ -39,7 +39,7 @@ export function ShopSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="flex items-center gap-2">
+        <Button variant="outline" className="flex items-center gap-2 border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white">
           <Building2 className="h-4 w-4" />
           <span className="max-w-[140px] truncate">{activeShop.name}</span>
           <ChevronDown className="h-3 w-3 opacity-50" />

@@ -1,6 +1,7 @@
 import { Bike, Clock3, UserRound, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getStatusPalette } from "./status-colors";
 
 export interface JobCardData {
   hookIn: string;
@@ -17,6 +18,8 @@ export function JobCardContent({
   job: JobCardData;
   compact?: boolean;
 }) {
+  const palette = getStatusPalette(job.status);
+
   return (
     <div className="min-w-0">
       <div className="flex items-start justify-between gap-2">
@@ -34,7 +37,10 @@ export function JobCardContent({
         </div>
         <Badge
           variant="secondary"
-          className="h-5 max-w-[45%] shrink-0 truncate px-1.5 text-[10px] font-medium"
+          className={cn(
+            "h-5 max-w-[45%] shrink-0 truncate rounded-full px-1.5 text-[10px] font-medium",
+            palette.badge,
+          )}
           title={job.status}
         >
           {job.status}

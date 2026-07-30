@@ -2,6 +2,8 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { JobCardContent } from "@/components/calender/job-card-content";
+import { getStatusPalette } from "./status-colors";
+import { cn } from "@/lib/utils";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 export function DraggableWorkOrder({
@@ -30,6 +32,7 @@ export function DraggableWorkOrder({
   const customerItem =
     workorder.Serialized?.description || "Customer item unavailable";
   const statusName = statusMap[workorder.workorderStatusID] || "Unknown";
+  const palette = getStatusPalette(statusName);
 
   return (
     <div
@@ -37,9 +40,12 @@ export function DraggableWorkOrder({
       style={style}
       {...listeners}
       {...attributes}
-      className={`rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-3 cursor-move shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
-        isDragging ? "opacity-50" : ""
-      }`}
+      className={cn(
+        "cursor-move rounded-md border border-l-4 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:saturate-[1.35] hover:shadow-md",
+        palette.card,
+        palette.accent,
+        isDragging && "opacity-50",
+      )}
     >
       <JobCardContent
         job={{
