@@ -130,6 +130,14 @@ function responseRecord(
   return asRecord(Array.isArray(value) ? value[0] : value);
 }
 
+function firstNonZeroId(...values: unknown[]): string {
+  return (
+    values
+      .map((value) => String(value ?? ""))
+      .find((value) => value !== "" && value !== "0") ?? ""
+  );
+}
+
 function employeeName(value: unknown): string {
   const employee = asRecord(value);
   return [employee.firstName, employee.lastName]
@@ -782,6 +790,7 @@ export async function getWorkOrderDetails(
       lineTax ||
       numberValue(saleRecord.calcTax) ||
       numberValue(saleRecord.calcTax1) + numberValue(saleRecord.calcTax2) ||
+      numberValue(saleRecord.taxTotal) ||
       0;
 
     // Open work orders often have no calculated Sale tax yet. Workorder.tax
@@ -797,17 +806,20 @@ export async function getWorkOrderDetails(
         ? await fetchLightspeedJson(shopUrl, token)
         : null;
       const lightspeedShop = responseRecord(shopJson, "Shop");
-      const taxCategoryId = String(
-        saleRecord.taxCategoryID ||
-          customer.taxCategoryID ||
-          lightspeedShop.taxCategoryID ||
-          "",
+      const taxCategoryId = firstNonZeroId(
+        saleRecord.taxCategoryID,
+        customer.taxCategoryID,
+        lightspeedShop.taxCategoryID,
       );
+      let fallbackRate =
+        rateValue(saleRecord.tax1Rate) +
+        rateValue(saleRecord.tax2Rate);
 
-      if (taxCategoryId && taxCategoryId !== "0") {
+      if (fallbackRate === 0 && taxCategoryId) {
         const taxCategoryUrl =
           `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
-          `/TaxCategory/${encodeURIComponent(taxCategoryId)}.json`;
+          `/TaxCategory/${encodeURIComponent(taxCategoryId)}.json` +
+          `?load_relations=${encodeURIComponent('["TaxCategoryClasses"]')}`;
         const taxCategoryJson = await fetchLightspeedJson(
           taxCategoryUrl,
           token,
@@ -816,24 +828,24 @@ export async function getWorkOrderDetails(
           taxCategoryJson,
           "TaxCategory",
         );
-        const fallbackRate =
+        fallbackRate =
           rateValue(taxCategory.tax1Rate) +
           rateValue(taxCategory.tax2Rate);
+      }
 
-        if (fallbackRate > 0) {
-          const taxLabour = booleanValue(lightspeedShop.taxLabor);
-          const taxableSubtotal = lines.reduce((sum, line) => {
-            if (line.kind === "labour" && !taxLabour) return sum;
-            return sum + Math.max(0, line.subtotal - line.discount);
-          }, 0);
-          const taxableAfterWorkOrderDiscount = Math.max(
-            0,
-            taxableSubtotal - Math.max(0, workOrderDiscount - lineDiscounts),
-          );
-          tax =
-            Math.round(taxableAfterWorkOrderDiscount * fallbackRate * 100) /
-            100;
-        }
+      if (fallbackRate > 0) {
+        const taxLabour = booleanValue(lightspeedShop.taxLabor);
+        const taxableSubtotal = lines.reduce((sum, line) => {
+          if (line.kind === "labour" && !taxLabour) return sum;
+          return sum + Math.max(0, line.subtotal - line.discount);
+        }, 0);
+        const taxableAfterWorkOrderDiscount = Math.max(
+          0,
+          taxableSubtotal - Math.max(0, workOrderDiscount - lineDiscounts),
+        );
+        tax =
+          Math.round(taxableAfterWorkOrderDiscount * fallbackRate * 100) /
+          100;
       }
     }
 
