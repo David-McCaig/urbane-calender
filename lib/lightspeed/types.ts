@@ -24,6 +24,7 @@ export interface LightspeedSerialized {
   serializedID: string;
   description: string;
   unitPrice?: string;
+  serial?: string;
 }
 
 /** Work order status relation on a Lightspeed work order. */
@@ -45,8 +46,11 @@ export interface LightspeedWorkOrder {
   timeIn: string;
   etaOut: string;
   note: string;
+  receiptNote?: string;
+  description?: string;
   internalNote?: string;
   hookIn?: string;
+  hookOut?: string;
   warranty: string;
   archived: string;
   customerID: string;
@@ -62,6 +66,43 @@ export interface LightspeedWorkOrder {
   Serialized?: LightspeedSerialized;
   WorkorderStatus?: LightspeedWorkOrderStatus;
   Employee?: LightspeedEmployee;
+}
+
+export type WorkOrderLineKind = "labour" | "part" | "fee";
+
+export interface LightspeedWorkOrderLine {
+  id: string;
+  description: string;
+  note: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  kind: WorkOrderLineKind;
+  employeeName: string;
+  status: string;
+  isComplete: boolean;
+  durationMinutes: number;
+  reservedQuantity: number;
+}
+
+export interface LightspeedWorkOrderDetails extends LightspeedWorkOrder {
+  lines: LightspeedWorkOrderLine[];
+  totals: {
+    labour: number;
+    parts: number;
+    fees: number;
+    discounts: number;
+    tax: number;
+    total: number;
+  };
+}
+
+export interface WorkOrderDetailsResult {
+  status: "ok" | "unavailable";
+  workOrder: LightspeedWorkOrderDetails | null;
 }
 
 /** Response envelope for GET /API/V3/Account/{id}/Workorder.json */

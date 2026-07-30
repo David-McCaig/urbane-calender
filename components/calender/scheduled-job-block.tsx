@@ -7,10 +7,12 @@ export function ScheduledJobBlock({
   scheduledJob,
   cardData,
   onRemove,
+  onViewDetails,
 }: {
   scheduledJob: ScheduledJob;
   cardData: JobCardData;
   onRemove: () => void;
+  onViewDetails: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -42,7 +44,11 @@ export function ScheduledJobBlock({
         onRemove();
       }}
     >
-      <JobCardContent job={cardData} compact />
+      <JobCardContent
+        job={cardData}
+        compact
+        onViewDetails={onViewDetails}
+      />
     </div>
   );
 }

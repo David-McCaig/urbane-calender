@@ -7,9 +7,11 @@ import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/t
 export function DraggableWorkOrder({
   workorder,
   statusMap,
+  onViewDetails,
 }: {
   workorder: LightspeedWorkOrder;
   statusMap: WorkOrderStatusMap;
+  onViewDetails?: (workorder: LightspeedWorkOrder, statusName: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -49,6 +51,11 @@ export function DraggableWorkOrder({
           status: statusName,
           duration: 1,
         }}
+        onViewDetails={
+          onViewDetails
+            ? () => onViewDetails(workorder, statusName)
+            : undefined
+        }
       />
     </div>
   );

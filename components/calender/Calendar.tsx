@@ -12,6 +12,10 @@ import { useCalendarData } from "./use-calendar-data";
 import { CalendarGrid } from "./calendar-grid";
 import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
 import { JobsPanel } from "./JobsPanel";
+import {
+  WorkOrderDetailsDialog,
+  type WorkOrderDetailsSelection,
+} from "./work-order-details-dialog";
 
 export default function Calendar() {
   const { activeShop, isLoading: shopLoading } = useActiveShop();
@@ -41,6 +45,8 @@ export default function Calendar() {
 
   // UI-only local state
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [detailsSelection, setDetailsSelection] =
+    useState<WorkOrderDetailsSelection | null>(null);
 
   // Refs for scroll syncing
   const headerScrollRef = useRef<HTMLDivElement>(null);
@@ -106,6 +112,7 @@ export default function Calendar() {
             setShowDatePicker(false);
           }}
           onRemoveScheduledJob={removeScheduledJob}
+          onViewWorkOrder={setDetailsSelection}
         />
 
         <JobsPanel
@@ -117,6 +124,13 @@ export default function Calendar() {
           onGoToToday={() => setWorkOrdersDate(new Date())}
           onDateSelect={setWorkOrdersDate}
           isDraggingScheduledJob={isDraggingScheduledJob}
+          onViewWorkOrder={(workOrder, statusName) =>
+            setDetailsSelection({
+              workOrderId: String(workOrder.workorderID),
+              initialWorkOrder: workOrder,
+              statusName,
+            })
+          }
         />
 
         <DragOverlay>
@@ -131,6 +145,11 @@ export default function Calendar() {
             </div>
           ) : null}
         </DragOverlay>
+        <WorkOrderDetailsDialog
+          shopId={activeShop.id}
+          selection={detailsSelection}
+          onClose={() => setDetailsSelection(null)}
+        />
       </div>
     </DndContext>
   );

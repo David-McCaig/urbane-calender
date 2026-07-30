@@ -37,6 +37,10 @@ interface JobsPanelProps {
   onGoToToday: () => void;
   onDateSelect: (date: Date) => void;
   isDraggingScheduledJob: boolean;
+  onViewWorkOrder: (
+    workOrder: LightspeedWorkOrder,
+    statusName: string,
+  ) => void;
 }
 
 function formatDate(date: Date): string {
@@ -87,6 +91,7 @@ export function JobsPanel({
   onGoToToday,
   onDateSelect,
   isDraggingScheduledJob,
+  onViewWorkOrder,
 }: JobsPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showInlineDatePicker, setShowInlineDatePicker] = useState(false);
@@ -332,6 +337,7 @@ export function JobsPanel({
                             key={wo.workorderID}
                             workorder={wo}
                             statusMap={workOrderStatusMap}
+                            onViewDetails={onViewWorkOrder}
                           />
                         ))}
                       </div>

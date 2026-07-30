@@ -10,6 +10,7 @@ import { DatePicker } from "./date-picker";
 import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
 import type { Mechanic, ScheduledJob } from "@/lib/database/calendar";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
+import type { WorkOrderDetailsSelection } from "@/components/calender/work-order-details-dialog";
 
 interface CalendarGridProps {
   mechanics: Mechanic[];
@@ -26,6 +27,7 @@ interface CalendarGridProps {
   onToggleDatePicker: () => void;
   onDateSelect: (date: Date) => void;
   onRemoveScheduledJob: (id: string) => void;
+  onViewWorkOrder: (selection: WorkOrderDetailsSelection) => void;
 }
 
 function formatDate(date: Date) {
@@ -52,6 +54,7 @@ export function CalendarGrid({
   onToggleDatePicker,
   onDateSelect,
   onRemoveScheduledJob,
+  onViewWorkOrder,
 }: CalendarGridProps) {
   if (loadingGrid) {
     return (
@@ -262,6 +265,21 @@ export function CalendarGrid({
                         onRemove={() =>
                           onRemoveScheduledJob(scheduledJob.id)
                         }
+                        onViewDetails={() => {
+                          const workOrder =
+                            scheduledWorkOrders[scheduledJob.job.workorder_id];
+                          const statusName =
+                            workOrderStatusMap[
+                              workOrder?.workorderStatusID ||
+                                scheduledJob.job.workorder_status_id
+                            ] || "Unknown";
+                          onViewWorkOrder({
+                            workOrderId: scheduledJob.job.workorder_id,
+                            initialWorkOrder: workOrder,
+                            statusName,
+                            assignedEmployee: scheduledJob.mechanic.name,
+                          });
+                        }}
                       />
                     ))}
                 </div>
