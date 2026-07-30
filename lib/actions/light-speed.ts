@@ -117,6 +117,11 @@ function discountValue(value: unknown, subtotal: number): number {
   return Math.min(subtotal, subtotal * percent);
 }
 
+function rateValue(value: unknown): number {
+  const rate = Math.abs(numberValue(value));
+  return rate > 1 ? rate / 100 : rate;
+}
+
 function employeeName(value: unknown): string {
   const employee = asRecord(value);
   return [employee.firstName, employee.lastName]
@@ -163,9 +168,17 @@ function normalizeSaleLine(
   const discount =
     Math.abs(numberValue(line.calcDiscount ?? line.discountAmount)) ||
     discountValue(line.Discount, subtotal);
-  const tax =
+  const calculatedTax =
     numberValue(line.calcTax ?? line.calcTax1) +
     numberValue(line.calcTax2);
+  const taxRate =
+    rateValue(line.tax1Rate) +
+    rateValue(line.tax2Rate);
+  const tax =
+    calculatedTax ||
+    (booleanValue(line.tax)
+      ? Math.round(Math.max(0, subtotal - discount) * taxRate * 100) / 100
+      : 0);
   const total =
     numberValue(line.calcTotal ?? line.total) ||
     Math.max(0, subtotal - discount + tax);
