@@ -10,6 +10,10 @@ import {
   getLightspeedWorkOrderDateRange,
   isWorkOrderOnDate,
 } from "@/lib/lightspeed/work-order-date";
+import {
+  calculateWorkOrderTotals,
+  normalizeWorkOrderPricingLine,
+} from "@/lib/lightspeed/work-order-pricing";
 import type {
   LightspeedWorkOrder,
   LightspeedWorkOrderDetails,
@@ -170,90 +174,12 @@ function normalizeSaleLine(
   kindOverride?: LightspeedWorkOrderLine["kind"],
   serviceRate = 0,
 ): LightspeedWorkOrderLine {
-  const line = asRecord(value);
-  const item = asRecord(line.Item);
-  const quantity = numberValue(line.unitQuantity ?? line.quantity) || 1;
-  const kind = kindOverride || lineKind(line);
-  const durationMinutes =
-    numberValue(line.hours) * 60 + numberValue(line.minutes);
-  const timedLabourPrice =
-    kind === "labour" && durationMinutes > 0
-      ? Math.round(serviceRate * (durationMinutes / 60) * 100) / 100
-      : 0;
-  const baseUnitPrice =
-    kind === "labour" || kind === "fee"
-      ? numberValue(line.unitPriceOverride) ||
-        numberValue(line.unitPrice) ||
-        timedLabourPrice ||
-        numberValue(line.unitCost)
-      : numberValue(line.unitPrice ?? line.amount);
-  const subtotal =
-    numberValue(line.calcSubtotal ?? line.subtotal) ||
-    quantity * baseUnitPrice;
-  const unitPrice = baseUnitPrice || subtotal / quantity;
-  const discount =
-    Math.abs(numberValue(line.calcDiscount ?? line.discountAmount)) ||
-    discountValue(line.Discount, subtotal);
-  const calculatedTax =
-    numberValue(line.calcTax ?? line.calcTax1) +
-    numberValue(line.calcTax2);
-  const taxRate =
-    rateValue(line.tax1Rate) +
-    rateValue(line.tax2Rate);
-  const tax =
-    calculatedTax ||
-    (booleanValue(line.tax)
-      ? Math.round(Math.max(0, subtotal - discount) * taxRate * 100) / 100
-      : 0);
-  const total =
-    numberValue(line.calcTotal ?? line.total) ||
-    Math.max(0, subtotal - discount + tax);
-  const isComplete = booleanValue(line.done);
-  const isSpecialOrder = booleanValue(line.isSpecialOrder);
-
-  return {
-    id: String(
-      line.saleLineID ??
-        line.workorderItemID ??
-        line.workorderLineID ??
-        `${kindOverride || "line"}-${index}`,
-    ),
-    description:
-      stringValue(item.description) ||
-      stringValue(line.description) ||
-      stringValue(line.note) ||
-      "Work order item",
-    note:
-      stringValue(line.note) ===
-      (stringValue(item.description) ||
-        stringValue(line.description) ||
-        stringValue(line.note))
-        ? ""
-        : stringValue(line.note),
-    quantity,
-    unitPrice,
-    subtotal,
-    discount,
-    tax,
-    total,
-    kind: numberValue(line.itemFeeID) !== 0 ? "fee" : kind,
-    employeeName: employeeName(line.Employee),
-    status:
-      kindOverride === "labour"
-        ? isComplete
-          ? "Finished"
-          : "Not finished"
-        : isSpecialOrder
-          ? "Special order"
-          : "Standard",
-    isComplete,
-    durationMinutes,
-    reservedQuantity: numberValue(
-      line.reservedQuantity ??
-        line.unitQuantityReserved ??
-        line.quantityReserved,
-    ),
-  };
+  return normalizeWorkOrderPricingLine(
+    value,
+    index,
+    kindOverride || lineKind(asRecord(value)),
+    serviceRate,
+  );
 }
 
 function normalizeWorkOrderLine(
@@ -782,10 +708,6 @@ export async function getWorkOrderDetails(
       saleRecord = responseRecord(saleJson, "Sale");
     }
 
-    const categoryTotal = (kind: LightspeedWorkOrderLine["kind"]) =>
-      lines
-        .filter((line) => line.kind === kind)
-        .reduce((sum, line) => sum + line.subtotal, 0);
     const lineDiscounts = lines.reduce(
       (sum, line) => sum + line.discount,
       0,
@@ -856,14 +778,10 @@ export async function getWorkOrderDetails(
     const details: LightspeedWorkOrderDetails = {
       ...workOrder,
       lines,
-      totals: {
-        labour: categoryTotal("labour"),
-        parts: categoryTotal("part"),
-        fees: categoryTotal("fee"),
-        discounts,
-        tax,
-        total: Math.max(0, subtotal - discounts + tax),
-      },
+      totals: calculateWorkOrderTotals(lines, {
+        workOrderDiscount: workOrderRecord.Discount,
+        calculatedTax: tax,
+      }),
     };
 
     return { status: "ok", workOrder: details };
