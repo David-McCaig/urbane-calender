@@ -6,7 +6,54 @@ import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getValidAccessToken, getLightspeedApiConfig } from "@/lib/lightspeed/api";
+import {
+  getLightspeedWorkOrderDateRange,
+  isWorkOrderOnDate,
+} from "@/lib/lightspeed/work-order-date";
 import type { LightspeedWorkOrder, LightspeedWorkOrderResponse, LightspeedWorkOrderStatusResponse, WorkOrderStatusMap } from "@/lib/lightspeed/types";
+
+const WORK_ORDER_HYDRATION_DEDUPE_MS = 10_000;
+const LIGHTSPEED_HYDRATION_TIMEOUT_MS = 8_000;
+
+export interface WorkOrderHydrationResult {
+  status: "ok" | "rate_limited" | "unavailable";
+  orders: LightspeedWorkOrder[];
+  retryAfter: string | null;
+  retryable: boolean;
+}
+
+interface WorkOrderHydrationCacheEntry {
+  expiresAt: number;
+  promise: Promise<WorkOrderHydrationResult>;
+}
+
+const workOrderHydrationRequests = new Map<
+  string,
+  WorkOrderHydrationCacheEntry
+>();
+
+function logLightspeedRateLimitHeaders(response: Response): void {
+  const bucketLevel = response.headers.get("x-ls-api-bucket-level");
+  const dripRate = response.headers.get("x-ls-api-drip-rate");
+  const requestCost = response.headers.get("x-ls-api-request-cost");
+
+  if (!bucketLevel) return;
+
+  const [level, capacity] = bucketLevel.split("/").map(Number);
+  const isNearCapacity =
+    Number.isFinite(level) &&
+    Number.isFinite(capacity) &&
+    capacity > 0 &&
+    level / capacity >= 0.8;
+
+  if (isNearCapacity) {
+    console.warn("[Lightspeed] API bucket nearing capacity", {
+      bucketLevel,
+      dripRate,
+      requestCost,
+    });
+  }
+}
 
 /**
  * Initiates the OAuth flow with Lightspeed. Generates CSRF state server-side,
@@ -177,15 +224,10 @@ export async function getWorkOrdersByDate(
 
     const { token, accountId } = config;
 
-    // Build date range — etaOut on the given date using Lightspeed's
-    // between-operator query: ?etaOut=><,startISO,endISO
-    // Parse manually to avoid new Date("YYYY-MM-DD") which is UTC-parsed
-    // and shifts the date in non-UTC timezones.
-    const [year, month, day] = date.split('-').map(Number);
-    const startDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const endDate = new Date(year, month - 1, day, 23, 59, 59, 999);
-    const startISO = startDate.toISOString();
-    const endISO = endDate.toISOString();
+    // Fetch a UTC buffer around the selected date, then filter by the date
+    // portion of etaOut. This keeps server timezones and time-of-day values
+    // from excluding work orders that belong to the selected calendar day.
+    const { startISO, endISO } = getLightspeedWorkOrderDateRange(date);
 
     // Lightspeed between operator: %3E%3C = ><  ,  %2C = ,
     const queryString =
@@ -221,7 +263,9 @@ export async function getWorkOrdersByDate(
       allWorkOrders = json.Workorder;
     }
 
-    return allWorkOrders;
+    return allWorkOrders.filter((workOrder) =>
+      isWorkOrderOnDate(workOrder.etaOut, date),
+    );
   } catch (error) {
     console.error('[getWorkOrdersByDate] Unexpected error:', error);
     return [];
@@ -235,14 +279,35 @@ export async function getWorkOrdersByDate(
 export async function getWorkOrdersByIds(
   shopId: string,
   workorderIds: string[],
-): Promise<LightspeedWorkOrder[]> {
-  const uniqueIds = [...new Set(workorderIds)].filter(Boolean);
-  if (uniqueIds.length === 0) return [];
+): Promise<WorkOrderHydrationResult> {
+  const uniqueIds = [...new Set(workorderIds)].filter(Boolean).sort();
+  if (uniqueIds.length === 0) {
+    return { status: "ok", orders: [], retryAfter: null, retryable: false };
+  }
 
-  try {
-    const config = await getLightspeedApiConfig(shopId);
-    if (!config) return [];
+  // Authorize every caller before consulting the process-wide cache. The cache
+  // is shared across requests, so returning a warm entry first could expose one
+  // shop's work orders to a caller who is not a member of that shop.
+  const config = await getLightspeedApiConfig(shopId);
+  if (!config) {
+    return {
+      status: "unavailable",
+      orders: [],
+      retryAfter: null,
+      retryable: false,
+    };
+  }
 
+  const cacheKey = `${shopId}:${uniqueIds.join(",")}`;
+  const now = Date.now();
+  const cached = workOrderHydrationRequests.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  for (const [key, entry] of workOrderHydrationRequests) {
+    if (entry.expiresAt <= now) workOrderHydrationRequests.delete(key);
+  }
+
+  const promise = (async (): Promise<WorkOrderHydrationResult> => {
     const { token, accountId } = config;
     const idFilter = ["IN", ...uniqueIds].join(",");
     const queryString =
@@ -255,13 +320,35 @@ export async function getWorkOrdersByIds(
         Accept: "application/json",
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(LIGHTSPEED_HYDRATION_TIMEOUT_MS),
     });
+
+    logLightspeedRateLimitHeaders(response);
+
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("retry-after");
+      console.warn("[getWorkOrdersByIds] Lightspeed rate limit reached", {
+        retryAfter,
+        bucketLevel: response.headers.get("x-ls-api-bucket-level"),
+      });
+      return {
+        status: "rate_limited",
+        orders: [],
+        retryAfter,
+        retryable: true,
+      };
+    }
 
     if (!response.ok) {
       console.error(
         `[getWorkOrdersByIds] Lightspeed API error: ${response.status}`,
       );
-      return [];
+      return {
+        status: "unavailable",
+        orders: [],
+        retryAfter: null,
+        retryable: response.status >= 500,
+      };
     }
 
     const json: LightspeedWorkOrderResponse = await response.json();
@@ -270,16 +357,30 @@ export async function getWorkOrdersByIds(
       (!Array.isArray(json.Workorder) &&
         Object.keys(json.Workorder).length === 0)
     ) {
-      return [];
+      return { status: "ok", orders: [], retryAfter: null, retryable: false };
     }
 
-    return Array.isArray(json.Workorder)
+    const orders = Array.isArray(json.Workorder)
       ? json.Workorder
       : [json.Workorder as unknown as LightspeedWorkOrder];
-  } catch (error) {
+
+    return { status: "ok", orders, retryAfter: null, retryable: false };
+  })().catch((error): WorkOrderHydrationResult => {
     console.error("[getWorkOrdersByIds] Unexpected error:", error);
-    return [];
-  }
+    return {
+      status: "unavailable",
+      orders: [],
+      retryAfter: null,
+      retryable: true,
+    };
+  });
+
+  workOrderHydrationRequests.set(cacheKey, {
+    expiresAt: now + WORK_ORDER_HYDRATION_DEDUPE_MS,
+    promise,
+  });
+
+  return promise;
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import {
   getExistingWorkorderIds,
@@ -24,7 +24,12 @@ import {
   getWorkOrdersByDate,
   getWorkOrdersByIds,
   getWorkorderStatuses,
+  type WorkOrderHydrationResult,
 } from "@/lib/actions/light-speed";
+import {
+  getHydrationRetryDelay,
+  shouldRetryHydration,
+} from "@/lib/lightspeed/work-order-hydration";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 
 /** Format a Date as YYYY-MM-DD in the local timezone — avoids the UTC shift of toISOString(). */
@@ -82,6 +87,13 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   const [workOrdersDate, setWorkOrdersDate] = useState(new Date());
   const [activeDragOverlay, setActiveDragOverlay] = useState<DragOverlayData | null>(null);
   const [isDraggingScheduledJob, setIsDraggingScheduledJob] = useState(false);
+  const scheduledWorkorderIdsKey = useMemo(
+    () =>
+      [...new Set(scheduledJobs.map((item) => item.job.workorder_id))]
+        .sort()
+        .join(","),
+    [scheduledJobs],
+  );
 
   // Keep a ref to currentDate so the realtime callbacks always read the latest date
   // without needing to resubscribe when the date changes.
@@ -95,6 +107,10 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   // Keep a ref to the current workorder IDs so the realtime subscription callback
   // can re-check only the displayed IDs without resubscribing on every data change.
   const workOrderIdsRef = useRef<string[]>([]);
+
+  // Track which shop owns the hydrated work-order map so details from one shop
+  // cannot remain visible after switching to another.
+  const hydratedWorkOrdersShopIdRef = useRef<string | null>(null);
 
   // Load grid data — mechanics, scheduled jobs, local jobs, statuses
   useEffect(() => {
@@ -120,32 +136,65 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
   // Hydrate scheduled cards with current Lightspeed data. Supabase remains
   // responsible only for placement and duration.
   useEffect(() => {
-    if (!activeShop) return;
+    const shopId = activeShop?.id ?? null;
+    if (hydratedWorkOrdersShopIdRef.current !== shopId) {
+      hydratedWorkOrdersShopIdRef.current = shopId;
+      setScheduledWorkOrders({});
+    }
+    if (!shopId) return;
 
     let cancelled = false;
-    const workorderIds = scheduledJobs.map((item) => item.job.workorder_id);
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let hydrationAttempt = 0;
+    const workorderIds = scheduledWorkorderIdsKey
+      ? scheduledWorkorderIdsKey.split(",")
+      : [];
     if (workorderIds.length === 0) {
       setScheduledWorkOrders({});
       return;
     }
 
-    getWorkOrdersByIds(activeShop.id, workorderIds)
-      .then((orders) => {
-        if (cancelled) return;
-        setScheduledWorkOrders(
-          Object.fromEntries(
-            orders.map((order) => [String(order.workorderID), order]),
-          ),
-        );
-      })
-      .catch((error) => {
-        console.error("Error hydrating scheduled work orders:", error);
-      });
+    const hydrateWorkOrders = () => {
+      hydrationAttempt += 1;
+      getWorkOrdersByIds(shopId, workorderIds)
+        .then((result) => {
+          if (cancelled) return;
+          if (result.status !== "ok") {
+            if (!shouldRetryHydration(result, hydrationAttempt)) {
+              return;
+            }
+            const delay = getHydrationRetryDelay(result, hydrationAttempt - 1);
+            retryTimer = setTimeout(hydrateWorkOrders, delay);
+            return;
+          }
+          setScheduledWorkOrders(
+            Object.fromEntries(
+              result.orders.map((order) => [String(order.workorderID), order]),
+            ),
+          );
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          console.error("Error hydrating scheduled work orders:", error);
+          const retryResult: WorkOrderHydrationResult = {
+            status: "unavailable",
+            orders: [],
+            retryAfter: null,
+            retryable: true,
+          };
+          if (!shouldRetryHydration(retryResult, hydrationAttempt)) return;
+          const delay = getHydrationRetryDelay(retryResult, hydrationAttempt - 1);
+          retryTimer = setTimeout(hydrateWorkOrders, delay);
+        });
+    };
+
+    hydrateWorkOrders();
 
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [scheduledJobs, activeShop]);
+  }, [scheduledWorkorderIdsKey, activeShop]);
 
   // Load Lightspeed work orders — independent from grid date
   useEffect(() => {
