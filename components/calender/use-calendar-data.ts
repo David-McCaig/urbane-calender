@@ -26,44 +26,15 @@ import {
   getWorkorderStatuses,
   type WorkOrderHydrationResult,
 } from "@/lib/actions/light-speed";
+import {
+  getHydrationRetryDelay,
+  shouldRetryHydration,
+} from "@/lib/lightspeed/work-order-hydration";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
-
-const HYDRATION_MIN_RETRY_MS = 11_000;
-const HYDRATION_BASE_RETRY_MS = 15_000;
-const HYDRATION_MAX_RETRY_MS = 5 * 60_000;
-const HYDRATION_RETRY_JITTER_MS = 1_000;
-const HYDRATION_MAX_ATTEMPTS = 5;
 
 /** Format a Date as YYYY-MM-DD in the local timezone — avoids the UTC shift of toISOString(). */
 export function formatLocalDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function getHydrationRetryDelay(
-  result: WorkOrderHydrationResult,
-  attempt: number,
-): number {
-  let retryAfterMs = 0;
-  if (result.status === "rate_limited" && result.retryAfter) {
-    const retryAfterSeconds = Number(result.retryAfter);
-    if (Number.isFinite(retryAfterSeconds)) {
-      retryAfterMs = retryAfterSeconds * 1_000;
-    } else {
-      const retryAfterDate = Date.parse(result.retryAfter);
-      if (Number.isFinite(retryAfterDate)) {
-        retryAfterMs = Math.max(0, retryAfterDate - Date.now());
-      }
-    }
-  }
-
-  const backoffMs = Math.min(
-    HYDRATION_BASE_RETRY_MS * 2 ** attempt,
-    HYDRATION_MAX_RETRY_MS,
-  );
-  return (
-    Math.max(HYDRATION_MIN_RETRY_MS, retryAfterMs, backoffMs) +
-    Math.random() * HYDRATION_RETRY_JITTER_MS
-  );
 }
 
 /** Lightweight overlay data for the drag overlay. */
@@ -189,7 +160,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
         .then((result) => {
           if (cancelled) return;
           if (result.status !== "ok") {
-            if (!result.retryable || hydrationAttempt >= HYDRATION_MAX_ATTEMPTS) {
+            if (!shouldRetryHydration(result, hydrationAttempt)) {
               return;
             }
             const delay = getHydrationRetryDelay(result, hydrationAttempt - 1);
@@ -205,13 +176,13 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
         .catch((error) => {
           if (cancelled) return;
           console.error("Error hydrating scheduled work orders:", error);
-          if (hydrationAttempt >= HYDRATION_MAX_ATTEMPTS) return;
           const retryResult: WorkOrderHydrationResult = {
             status: "unavailable",
             orders: [],
             retryAfter: null,
             retryable: true,
           };
+          if (!shouldRetryHydration(retryResult, hydrationAttempt)) return;
           const delay = getHydrationRetryDelay(retryResult, hydrationAttempt - 1);
           retryTimer = setTimeout(hydrateWorkOrders, delay);
         });
