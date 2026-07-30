@@ -1,5 +1,6 @@
-import { Bike, Clock3, UserRound, Wrench } from "lucide-react";
+import { Bike, Clock3, Eye, UserRound, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export interface JobCardData {
@@ -13,9 +14,11 @@ export interface JobCardData {
 export function JobCardContent({
   job,
   compact = false,
+  onViewDetails,
 }: {
   job: JobCardData;
   compact?: boolean;
+  onViewDetails?: () => void;
 }) {
   return (
     <div className="min-w-0">
@@ -32,13 +35,36 @@ export function JobCardContent({
             {job.customerItem}
           </p>
         </div>
-        <Badge
-          variant="secondary"
-          className="h-5 max-w-[45%] shrink-0 truncate px-1.5 text-[10px] font-medium"
-          title={job.status}
-        >
-          {job.status}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1">
+          <Badge
+            variant="secondary"
+            className="h-5 max-w-[96px] truncate px-1.5 text-[10px] font-medium"
+            title={job.status}
+          >
+            {job.status}
+          </Badge>
+          {onViewDetails && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "rounded-full p-0 text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+                compact ? "h-6 w-6" : "h-7 w-7",
+              )}
+              aria-label="View work order details"
+              title="View details"
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onViewDetails();
+              }}
+            >
+              <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className={cn("mt-1.5 space-y-1", compact && "mt-1 space-y-0.5")}>

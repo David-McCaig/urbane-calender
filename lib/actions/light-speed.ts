@@ -10,10 +10,226 @@ import {
   getLightspeedWorkOrderDateRange,
   isWorkOrderOnDate,
 } from "@/lib/lightspeed/work-order-date";
-import type { LightspeedWorkOrder, LightspeedWorkOrderResponse, LightspeedWorkOrderStatusResponse, WorkOrderStatusMap } from "@/lib/lightspeed/types";
+import type {
+  LightspeedWorkOrder,
+  LightspeedWorkOrderDetails,
+  LightspeedWorkOrderLine,
+  LightspeedWorkOrderResponse,
+  LightspeedWorkOrderStatusResponse,
+  WorkOrderDetailsResult,
+  WorkOrderStatusMap,
+} from "@/lib/lightspeed/types";
 
 const WORK_ORDER_HYDRATION_DEDUPE_MS = 10_000;
 const LIGHTSPEED_HYDRATION_TIMEOUT_MS = 8_000;
+
+type LightspeedRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): LightspeedRecord {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as LightspeedRecord)
+    : {};
+}
+
+function asArray(value: unknown): unknown[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  const record = asRecord(value);
+  return Object.keys(record).length === 0 ? [] : [record];
+}
+
+function relationArray(
+  container: unknown,
+  singularName: string,
+  pluralName: string,
+): unknown[] {
+  const record = asRecord(container);
+  const relation = record[pluralName] ?? record[singularName];
+  const relationRecord = asRecord(relation);
+  return asArray(
+    relationRecord[singularName] ??
+      relationRecord[pluralName] ??
+      relation,
+  );
+}
+
+function mergeRawLines(
+  primary: unknown[],
+  fallback: unknown[],
+  idField: string,
+): unknown[] {
+  const ids = new Set(
+    primary
+      .map((value) => String(asRecord(value)[idField] ?? ""))
+      .filter(Boolean),
+  );
+  return [
+    ...primary,
+    ...fallback.filter((value) => {
+      const id = String(asRecord(value)[idField] ?? "");
+      if (id && ids.has(id)) return false;
+      if (id) ids.add(id);
+      return true;
+    }),
+  ];
+}
+
+function numberValue(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function booleanValue(value: unknown): boolean {
+  return value === true || value === "true" || value === "1" || value === 1;
+}
+
+function discountValue(value: unknown, subtotal: number): number {
+  const discount = asRecord(value);
+  const fixedAmount = Math.abs(numberValue(discount.discountAmount));
+  if (fixedAmount > 0) return Math.min(subtotal, fixedAmount);
+
+  const rawPercent = Math.abs(numberValue(discount.discountPercent));
+  const percent = rawPercent > 1 ? rawPercent / 100 : rawPercent;
+  return Math.min(subtotal, subtotal * percent);
+}
+
+function employeeName(value: unknown): string {
+  const employee = asRecord(value);
+  return [employee.firstName, employee.lastName]
+    .filter((part): part is string => typeof part === "string" && Boolean(part))
+    .join(" ");
+}
+
+function lineKind(line: LightspeedRecord): LightspeedWorkOrderLine["kind"] {
+  const item = asRecord(line.Item);
+  const category = asRecord(item.Category);
+  const searchable = [
+    line.lineType,
+    item.type,
+    item.itemType,
+    item.description,
+    category.name,
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  if (/labou?r|service/.test(searchable)) return "labour";
+  if (/fee|misc|charge|shipping/.test(searchable)) return "fee";
+  return "part";
+}
+
+function normalizeSaleLine(
+  value: unknown,
+  index: number,
+  kindOverride?: LightspeedWorkOrderLine["kind"],
+): LightspeedWorkOrderLine {
+  const line = asRecord(value);
+  const item = asRecord(line.Item);
+  const quantity = numberValue(line.unitQuantity ?? line.quantity) || 1;
+  const kind = kindOverride || lineKind(line);
+  const baseUnitPrice =
+    kind === "labour" || kind === "fee"
+      ? numberValue(line.unitPriceOverride) || numberValue(line.unitCost)
+      : numberValue(line.unitPrice ?? line.amount);
+  const subtotal =
+    numberValue(line.calcSubtotal ?? line.subtotal) ||
+    quantity * baseUnitPrice;
+  const unitPrice = baseUnitPrice || subtotal / quantity;
+  const discount =
+    Math.abs(numberValue(line.calcDiscount ?? line.discountAmount)) ||
+    discountValue(line.Discount, subtotal);
+  const tax =
+    numberValue(line.calcTax ?? line.calcTax1) +
+    numberValue(line.calcTax2);
+  const total =
+    numberValue(line.calcTotal ?? line.total) ||
+    Math.max(0, subtotal - discount + tax);
+  const isComplete = booleanValue(line.done);
+  const isSpecialOrder = booleanValue(line.isSpecialOrder);
+  const durationMinutes =
+    numberValue(line.hours) * 60 + numberValue(line.minutes);
+
+  return {
+    id: String(
+      line.saleLineID ??
+        line.workorderItemID ??
+        line.workorderLineID ??
+        `${kindOverride || "line"}-${index}`,
+    ),
+    description:
+      stringValue(item.description) ||
+      stringValue(line.description) ||
+      stringValue(line.note) ||
+      "Work order item",
+    note:
+      stringValue(line.note) ===
+      (stringValue(item.description) ||
+        stringValue(line.description) ||
+        stringValue(line.note))
+        ? ""
+        : stringValue(line.note),
+    quantity,
+    unitPrice,
+    subtotal,
+    discount,
+    tax,
+    total,
+    kind: numberValue(line.itemFeeID) !== 0 ? "fee" : kind,
+    employeeName: employeeName(line.Employee),
+    status:
+      kindOverride === "labour"
+        ? isComplete
+          ? "Finished"
+          : "Not finished"
+        : isSpecialOrder
+          ? "Special order"
+          : "Standard",
+    isComplete,
+    durationMinutes,
+    reservedQuantity: numberValue(
+      line.reservedQuantity ??
+        line.unitQuantityReserved ??
+        line.quantityReserved,
+    ),
+  };
+}
+
+function normalizeWorkOrderLine(
+  value: unknown,
+  index: number,
+): LightspeedWorkOrderLine {
+  const line = asRecord(value);
+  const item = asRecord(line.Item);
+  const searchable = [line.note, line.description, item.description]
+    .filter((entry): entry is string => typeof entry === "string")
+    .join(" ")
+    .toLowerCase();
+  const kind = /fee|misc|charge|shipping/.test(searchable) ? "fee" : "labour";
+  return normalizeSaleLine(value, index, kind);
+}
+
+async function fetchLightspeedJson(
+  url: string,
+  token: string,
+): Promise<LightspeedRecord | null> {
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(LIGHTSPEED_HYDRATION_TIMEOUT_MS),
+  });
+
+  logLightspeedRateLimitHeaders(response);
+  if (!response.ok) return null;
+  return (await response.json()) as LightspeedRecord;
+}
 
 export interface WorkOrderHydrationResult {
   status: "ok" | "rate_limited" | "unavailable";
@@ -381,6 +597,152 @@ export async function getWorkOrdersByIds(
   });
 
   return promise;
+}
+
+/**
+ * Loads the complete read-only view of a work order. This is intentionally
+ * fetched on demand so the calendar does not pay for sale lines and totals
+ * until a user asks to see them.
+ */
+export async function getWorkOrderDetails(
+  shopId: string,
+  workorderId: string,
+): Promise<WorkOrderDetailsResult> {
+  try {
+    const config = await getLightspeedApiConfig(shopId);
+    if (!config) return { status: "unavailable", workOrder: null };
+
+    const { token, accountId } = config;
+    const relations = encodeURIComponent(
+      '["Customer","Serialized","Employee","Discount","WorkorderItems","WorkorderItems.Discount","WorkorderLines","WorkorderLines.Discount","WorkorderLines.TaxClass"]',
+    );
+    const workOrderUrl =
+      `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
+      `/Workorder/${encodeURIComponent(workorderId)}.json?load_relations=${relations}`;
+    const workOrderJson = await fetchLightspeedJson(workOrderUrl, token);
+    const workOrderValue = workOrderJson?.Workorder;
+    const workOrderRecord = asRecord(
+      Array.isArray(workOrderValue) ? workOrderValue[0] : workOrderValue,
+    );
+
+    if (Object.keys(workOrderRecord).length === 0) {
+      return { status: "unavailable", workOrder: null };
+    }
+
+    const workOrder = workOrderRecord as unknown as LightspeedWorkOrder;
+    const saleId = String(workOrder.saleID || "");
+    let saleRecord: LightspeedRecord = {};
+    let lines: LightspeedWorkOrderLine[] = [];
+
+    const workOrderBaseUrl =
+      `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
+      `/Workorder/${encodeURIComponent(workorderId)}`;
+    const itemRelations = encodeURIComponent(
+      '["Item","Employee","Discount"]',
+    );
+    const workOrderLineRelations = encodeURIComponent(
+      '["Item","Employee","Discount","TaxClass"]',
+    );
+    const [itemsJson, labourJson] = await Promise.all([
+      fetchLightspeedJson(
+        `${workOrderBaseUrl}/WorkorderItem.json?load_relations=${itemRelations}`,
+        token,
+      ),
+      fetchLightspeedJson(
+        `${workOrderBaseUrl}/WorkorderLine.json?load_relations=${workOrderLineRelations}`,
+        token,
+      ),
+    ]);
+
+    const embeddedItems = relationArray(
+      workOrderRecord,
+      "WorkorderItem",
+      "WorkorderItems",
+    );
+    const endpointItems = relationArray(
+      itemsJson,
+      "WorkorderItem",
+      "WorkorderItems",
+    );
+    const embeddedLines = relationArray(
+      workOrderRecord,
+      "WorkorderLine",
+      "WorkorderLines",
+    );
+    const endpointLines = relationArray(
+      labourJson,
+      "WorkorderLine",
+      "WorkorderLines",
+    );
+    const rawItems = mergeRawLines(
+      endpointItems,
+      embeddedItems,
+      "workorderItemID",
+    );
+    const rawLines = mergeRawLines(
+      endpointLines,
+      embeddedLines,
+      "workorderLineID",
+    );
+
+    const parts = rawItems.map((line, index) =>
+      normalizeSaleLine(line, index, "part"),
+    );
+    const labour = rawLines.map((line, index) =>
+      normalizeWorkOrderLine(line, index),
+    );
+    lines = [...labour, ...parts];
+
+    if (saleId) {
+      const saleRelations = encodeURIComponent('["Employee"]');
+      const saleUrl =
+        `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
+        `/Sale/${encodeURIComponent(saleId)}.json?load_relations=${saleRelations}`;
+      const saleJson = await fetchLightspeedJson(saleUrl, token);
+      const saleValue = saleJson?.Sale;
+      saleRecord = asRecord(
+        Array.isArray(saleValue) ? saleValue[0] : saleValue,
+      );
+    }
+
+    const categoryTotal = (kind: LightspeedWorkOrderLine["kind"]) =>
+      lines
+        .filter((line) => line.kind === kind)
+        .reduce((sum, line) => sum + line.subtotal, 0);
+    const lineDiscounts = lines.reduce(
+      (sum, line) => sum + line.discount,
+      0,
+    );
+    const lineTax = lines.reduce((sum, line) => sum + line.tax, 0);
+    const subtotal = lines.reduce((sum, line) => sum + line.subtotal, 0);
+    const workOrderDiscount = discountValue(
+      workOrderRecord.Discount,
+      subtotal,
+    );
+    const discounts = workOrderDiscount || lineDiscounts;
+    const tax =
+      numberValue(saleRecord.calcTax) ||
+      numberValue(saleRecord.calcTax1) + numberValue(saleRecord.calcTax2) ||
+      lineTax;
+
+    const details: LightspeedWorkOrderDetails = {
+      ...workOrder,
+      lines,
+      totals: {
+        labour: categoryTotal("labour"),
+        parts: categoryTotal("part"),
+        fees: categoryTotal("fee"),
+        discounts,
+        tax,
+        total: Math.max(0, subtotal - discounts + tax),
+      },
+    };
+
+    return { status: "ok", workOrder: details };
+  } catch (error) {
+    console.error("[getWorkOrderDetails] Unexpected error:", error);
+    return { status: "unavailable", workOrder: null };
+  }
 }
 
 /**
