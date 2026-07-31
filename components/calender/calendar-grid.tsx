@@ -27,6 +27,7 @@ interface CalendarGridProps {
   onToggleDatePicker: () => void;
   onDateSelect: (date: Date) => void;
   onRemoveScheduledJob: (id: string) => void;
+  onResizeScheduledJob: (id: string, duration: number) => Promise<boolean>;
   onViewWorkOrder: (selection: WorkOrderDetailsSelection) => void;
 }
 
@@ -54,6 +55,7 @@ export function CalendarGrid({
   onToggleDatePicker,
   onDateSelect,
   onRemoveScheduledJob,
+  onResizeScheduledJob,
   onViewWorkOrder,
 }: CalendarGridProps) {
   if (loadingGrid) {
@@ -264,6 +266,9 @@ export function CalendarGrid({
                         })()}
                         onRemove={() =>
                           onRemoveScheduledJob(scheduledJob.id)
+                        }
+                        onResize={(duration) =>
+                          onResizeScheduledJob(scheduledJob.id, duration)
                         }
                         onViewDetails={() => {
                           const workOrder =

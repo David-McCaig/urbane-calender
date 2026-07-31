@@ -6,6 +6,7 @@ import {
   getExistingWorkorderIds,
   getJobByWorkorderId,
   createJob,
+  updateJob,
   getMechanics,
   getScheduledJobs,
   createScheduledJob,
@@ -69,6 +70,7 @@ interface UseCalendarDataReturn {
   handleDragCancel: () => void;
   // CRUD
   removeScheduledJob: (scheduledJobId: string) => Promise<void>;
+  resizeScheduledJob: (scheduledJobId: string, duration: number) => Promise<boolean>;
 }
 
 export function useCalendarData(activeShop: { id: string } | null): UseCalendarDataReturn {
@@ -528,6 +530,50 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     }
   };
 
+  const resizeScheduledJob = async (
+    scheduledJobId: string,
+    duration: number,
+  ): Promise<boolean> => {
+    const scheduledJob = scheduledJobs.find((item) => item.id === scheduledJobId);
+    if (!scheduledJob) return false;
+
+    const mechanicIndex = mechanics.findIndex(
+      (mechanic) => mechanic.id === scheduledJob.mechanic_id,
+    );
+    const resizedJob = { ...scheduledJob.job, duration };
+    const conflicts = getSchedulingConflicts(
+      resizedJob,
+      mechanicIndex,
+      scheduledJob.time_slot,
+      scheduledJobs.filter((item) => item.id !== scheduledJobId),
+      mechanics,
+    );
+
+    if (conflicts.length > 0) {
+      alert(`Cannot resize job: ${conflicts.join(", ")}`);
+      return false;
+    }
+
+    const dateString = formatLocalDate(currentDate);
+    setScheduledJobs((previous) =>
+      previous.map((item) =>
+        item.id === scheduledJobId
+          ? { ...item, job: { ...item.job, duration } }
+          : item,
+      ),
+    );
+
+    try {
+      await updateJob(scheduledJob.job.id, { duration });
+      return true;
+    } catch (error) {
+      console.error("Error resizing scheduled job:", error);
+      getScheduledJobs(dateString).then(setScheduledJobs).catch(console.error);
+      alert("Failed to resize job. Please try again.");
+      return false;
+    }
+  };
+
   return {
     mechanics,
     scheduledJobs,
@@ -549,5 +595,6 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     handleDragEnd,
     handleDragCancel,
     removeScheduledJob,
+    resizeScheduledJob,
   };
 }
