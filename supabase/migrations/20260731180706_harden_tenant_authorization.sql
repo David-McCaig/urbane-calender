@@ -4,6 +4,7 @@
 -- only when the authenticated user has a matching membership.
 CREATE OR REPLACE FUNCTION public.get_user_shop_id()
 RETURNS UUID
+STABLE
 SECURITY DEFINER
 SET search_path = ''
 LANGUAGE plpgsql
@@ -65,6 +66,7 @@ GRANT EXECUTE ON FUNCTION public.get_user_shop_id() TO authenticated, service_ro
 -- migration owner's privileges.
 CREATE OR REPLACE FUNCTION public.get_user_shop_role()
 RETURNS public.membership_role
+STABLE
 SECURITY DEFINER
 SET search_path = ''
 LANGUAGE plpgsql
@@ -101,12 +103,12 @@ CREATE POLICY "Users can update their own shop" ON public.shops
   FOR UPDATE
   TO authenticated
   USING (
-    id = public.get_user_shop_id()
-    AND public.get_user_shop_role() = 'owner'
+    id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) = 'owner'
   )
   WITH CHECK (
-    id = public.get_user_shop_id()
-    AND public.get_user_shop_role() = 'owner'
+    id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) = 'owner'
   );
 
 DROP POLICY IF EXISTS "Users can update mechanics from their shop" ON public.mechanics;
@@ -114,12 +116,12 @@ CREATE POLICY "Users can update mechanics from their shop" ON public.mechanics
   FOR UPDATE
   TO authenticated
   USING (
-    shop_id = public.get_user_shop_id()
-    AND public.get_user_shop_role() IN ('owner', 'manager')
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) IN ('owner', 'manager')
   )
   WITH CHECK (
-    shop_id = public.get_user_shop_id()
-    AND public.get_user_shop_role() IN ('owner', 'manager')
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) IN ('owner', 'manager')
   );
 
 DROP POLICY IF EXISTS "Users can update jobs from their shop" ON public.jobs;
@@ -127,37 +129,145 @@ CREATE POLICY "Users can update jobs from their shop" ON public.jobs
   FOR UPDATE
   TO authenticated
   USING (
-    shop_id = public.get_user_shop_id()
-    AND public.get_user_shop_role() IN ('owner', 'manager')
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) IN ('owner', 'manager')
   )
   WITH CHECK (
-    shop_id = public.get_user_shop_id()
-    AND public.get_user_shop_role() IN ('owner', 'manager')
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) IN ('owner', 'manager')
   );
 
 DROP POLICY IF EXISTS "Users can update scheduled jobs from their shop" ON public.scheduled_jobs;
 CREATE POLICY "Users can update scheduled jobs from their shop" ON public.scheduled_jobs
   FOR UPDATE
   TO authenticated
-  USING (shop_id = public.get_user_shop_id())
-  WITH CHECK (shop_id = public.get_user_shop_id());
+  USING (shop_id = (SELECT public.get_user_shop_id()))
+  WITH CHECK (shop_id = (SELECT public.get_user_shop_id()));
 
 DROP POLICY IF EXISTS "Owners can update memberships" ON public.user_shop_memberships;
 CREATE POLICY "Owners can update memberships" ON public.user_shop_memberships
   FOR UPDATE
   TO authenticated
   USING (
-    shop_id = public.get_user_shop_id()
-    AND public.get_user_shop_role() = 'owner'
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) = 'owner'
   )
   WITH CHECK (
-    shop_id = public.get_user_shop_id()
-    AND public.get_user_shop_role() = 'owner'
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) = 'owner'
   );
 
 DROP POLICY IF EXISTS "Members can update integrations for their shop" ON public.lightspeed_integrations;
 CREATE POLICY "Members can update integrations for their shop" ON public.lightspeed_integrations
   FOR UPDATE
   TO authenticated
-  USING (shop_id = public.get_user_shop_id())
-  WITH CHECK (shop_id = public.get_user_shop_id());
+  USING (shop_id = (SELECT public.get_user_shop_id()))
+  WITH CHECK (shop_id = (SELECT public.get_user_shop_id()));
+
+-- Cache row-independent authorization helpers once per statement across the
+-- remaining policies created by earlier migrations.
+ALTER POLICY "Users can view their own shop" ON public.shops
+  TO authenticated
+  USING (id = (SELECT public.get_user_shop_id()));
+
+ALTER POLICY "Users can insert their own shop" ON public.shops
+  TO authenticated
+  WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
+
+ALTER POLICY "Users can view mechanics from their shop" ON public.mechanics
+  TO authenticated
+  USING (shop_id = (SELECT public.get_user_shop_id()));
+
+ALTER POLICY "Users can insert mechanics for their shop" ON public.mechanics
+  TO authenticated
+  WITH CHECK (
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) IN ('owner', 'manager')
+  );
+
+ALTER POLICY "Users can delete mechanics from their shop" ON public.mechanics
+  TO authenticated
+  USING (
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) IN ('owner', 'manager')
+  );
+
+ALTER POLICY "Users can view jobs from their shop" ON public.jobs
+  TO authenticated
+  USING (shop_id = (SELECT public.get_user_shop_id()));
+
+ALTER POLICY "Users can insert jobs for their shop" ON public.jobs
+  TO authenticated
+  WITH CHECK (shop_id = (SELECT public.get_user_shop_id()));
+
+ALTER POLICY "Users can delete jobs from their shop" ON public.jobs
+  TO authenticated
+  USING (
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) IN ('owner', 'manager')
+  );
+
+ALTER POLICY "Users can view scheduled jobs from their shop" ON public.scheduled_jobs
+  TO authenticated
+  USING (shop_id = (SELECT public.get_user_shop_id()));
+
+ALTER POLICY "Users can insert scheduled jobs for their shop" ON public.scheduled_jobs
+  TO authenticated
+  WITH CHECK (shop_id = (SELECT public.get_user_shop_id()));
+
+ALTER POLICY "Users can delete scheduled jobs from their shop" ON public.scheduled_jobs
+  TO authenticated
+  USING (shop_id = (SELECT public.get_user_shop_id()));
+
+ALTER POLICY "Users can view members in their shops" ON public.user_shop_memberships
+  TO authenticated
+  USING (
+    user_id = (SELECT auth.uid())
+    OR shop_id = (SELECT public.get_user_shop_id())
+  );
+
+ALTER POLICY "Owners can delete memberships" ON public.user_shop_memberships
+  TO authenticated
+  USING (
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) = 'owner'
+  );
+
+ALTER POLICY "Members can view invitations for their shop" ON public.invitations
+  TO authenticated
+  USING (
+    shop_id IN (
+      SELECT membership.shop_id
+      FROM public.user_shop_memberships AS membership
+      WHERE membership.user_id = (SELECT auth.uid())
+    )
+  );
+
+ALTER POLICY "Owners can create invitations" ON public.invitations
+  TO authenticated
+  WITH CHECK (
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) = 'owner'
+  );
+
+ALTER POLICY "Owners can delete invitations" ON public.invitations
+  TO authenticated
+  USING (
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) = 'owner'
+  );
+
+ALTER POLICY "Members can insert integrations for their shop" ON public.lightspeed_integrations
+  TO authenticated
+  WITH CHECK (shop_id = (SELECT public.get_user_shop_id()));
+
+ALTER POLICY "Members can view integrations for their shop" ON public.lightspeed_integrations
+  TO authenticated
+  USING (shop_id = (SELECT public.get_user_shop_id()));
+
+ALTER POLICY "Owners can delete integrations" ON public.lightspeed_integrations
+  TO authenticated
+  USING (
+    shop_id = (SELECT public.get_user_shop_id())
+    AND (SELECT public.get_user_shop_role()) = 'owner'
+  );
