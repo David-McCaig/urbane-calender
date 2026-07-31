@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { getValidAccessToken, getLightspeedApiConfig } from "@/lib/lightspeed/api";
 import {
   getLightspeedWorkOrderDateRange,
@@ -328,6 +327,17 @@ export async function logoutLightspeed() {
     redirect("/onboarding");
   }
 
+  const { data: membership } = await supabase
+    .from("user_shop_memberships")
+    .select("role")
+    .eq("shop_id", shopId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (membership?.role !== "owner") {
+    throw new Error("Only shop owners can disconnect Lightspeed");
+  }
+
   // Delete integration row (RLS restricts to owner)
   const { error: deleteError } = await supabase
     .from("lightspeed_integrations")
@@ -336,22 +346,18 @@ export async function logoutLightspeed() {
     .eq("integration_type", "lightspeed");
 
   if (deleteError) {
-    console.error("[Lightspeed] Disconnect failed:", deleteError);
+    throw new Error("Failed to disconnect Lightspeed");
   }
 
-  // Clear the Lightspeed account ID from the shop (service client needed
-  // because shops UPDATE is restricted)
-  const serviceClient = createServiceClient();
-  const { error: shopUpdateError } = await serviceClient
+  // Use the caller's RLS-bound client so this privileged update cannot bypass
+  // the owner policy on shops.
+  const { error: shopUpdateError } = await supabase
     .from("shops")
     .update({ lightspeed_account_id: null })
     .eq("id", shopId);
 
   if (shopUpdateError) {
-    console.error(
-      "[Lightspeed] Failed to clear shop account ID:",
-      shopUpdateError,
-    );
+    throw new Error("Failed to clear the Lightspeed account ID");
   }
 
   // Clear any legacy cookies

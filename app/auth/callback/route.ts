@@ -37,11 +37,9 @@ export async function GET(request: NextRequest) {
   );
 
   if (!tokenResponse.ok) {
-    const body = await tokenResponse.text();
     console.error(
       "Lightspeed token exchange failed:",
       tokenResponse.status,
-      body,
     );
     const errorResponse = NextResponse.redirect(
       new URL("/protected?error=lightspeed_token_exchange_failed", baseUrl),
