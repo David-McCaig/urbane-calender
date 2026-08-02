@@ -13,6 +13,7 @@ import { useCalendarData } from "./use-calendar-data";
 import { CalendarGrid } from "./calendar-grid";
 import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
 import { JobsPanel } from "./JobsPanel";
+import { MechanicDayFilter } from "./mechanic-day-filter";
 import {
   WorkOrderDetailsDialog,
   type WorkOrderDetailsSelection,
@@ -23,6 +24,8 @@ export default function Calendar() {
 
   const {
     mechanics,
+    allMechanics,
+    mechanicDayStatuses,
     scheduledJobs,
     scheduledWorkOrders,
     workOrders,
@@ -42,6 +45,7 @@ export default function Calendar() {
     handleDragCancel,
     removeScheduledJob,
     resizeScheduledJob,
+    saveMechanicDayStatuses,
   } = useCalendarData(activeShop, DEFAULT_CALENDAR_HOURS);
 
   // UI-only local state
@@ -104,6 +108,14 @@ export default function Calendar() {
           currentDate={currentDate}
           loadingGrid={loadingGrid}
           showDatePicker={showDatePicker}
+          mechanicDayFilter={
+            <MechanicDayFilter
+              mechanics={allMechanics}
+              statuses={mechanicDayStatuses}
+              currentDate={currentDate}
+              onSave={saveMechanicDayStatuses}
+            />
+          }
           headerScrollRef={headerScrollRef}
           contentScrollRef={contentScrollRef}
           onNavigateDate={navigateDate}

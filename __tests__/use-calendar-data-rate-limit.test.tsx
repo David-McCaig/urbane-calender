@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getJobByWorkorderId: vi.fn(),
   createJob: vi.fn(),
   getMechanics: vi.fn(),
+  getMechanicDayStatuses: vi.fn(),
+  setMechanicDayStatuses: vi.fn(),
   getScheduledJobs: vi.fn(),
   createScheduledJob: vi.fn(),
   updateScheduledJob: vi.fn(),
@@ -14,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   subscribeToJobs: vi.fn(),
   subscribeToScheduledJobs: vi.fn(),
   subscribeToMechanics: vi.fn(),
+  subscribeToMechanicDayStatuses: vi.fn(),
   getSchedulingConflicts: vi.fn(),
   getWorkOrdersByDate: vi.fn(),
   getWorkOrdersByIds: vi.fn(),
@@ -25,6 +28,8 @@ vi.mock("@/lib/database/calendar", () => ({
   getJobByWorkorderId: mocks.getJobByWorkorderId,
   createJob: mocks.createJob,
   getMechanics: mocks.getMechanics,
+  getMechanicDayStatuses: mocks.getMechanicDayStatuses,
+  setMechanicDayStatuses: mocks.setMechanicDayStatuses,
   getScheduledJobs: mocks.getScheduledJobs,
   createScheduledJob: mocks.createScheduledJob,
   updateScheduledJob: mocks.updateScheduledJob,
@@ -33,6 +38,7 @@ vi.mock("@/lib/database/calendar", () => ({
   subscribeToJobs: mocks.subscribeToJobs,
   subscribeToScheduledJobs: mocks.subscribeToScheduledJobs,
   subscribeToMechanics: mocks.subscribeToMechanics,
+  subscribeToMechanicDayStatuses: mocks.subscribeToMechanicDayStatuses,
   getSchedulingConflicts: mocks.getSchedulingConflicts,
 }));
 
@@ -50,6 +56,7 @@ describe("useCalendarData hydration cleanup", () => {
     const subscription = () => ({ unsubscribe: vi.fn() });
 
     mocks.getMechanics.mockResolvedValue([]);
+    mocks.getMechanicDayStatuses.mockResolvedValue([]);
     mocks.getScheduledJobs.mockResolvedValue([
       {
         id: "scheduled-1",
@@ -65,6 +72,7 @@ describe("useCalendarData hydration cleanup", () => {
     mocks.subscribeToJobs.mockImplementation(subscription);
     mocks.subscribeToScheduledJobs.mockImplementation(subscription);
     mocks.subscribeToMechanics.mockImplementation(subscription);
+    mocks.subscribeToMechanicDayStatuses.mockImplementation(subscription);
     mocks.getSchedulingConflicts.mockReturnValue([]);
   });
 

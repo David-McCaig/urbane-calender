@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import {
   getExistingWorkorderIds,
@@ -8,6 +8,8 @@ import {
   createJob,
   updateJob,
   getMechanics,
+  getMechanicDayStatuses,
+  setMechanicDayStatuses,
   getScheduledJobs,
   createScheduledJob,
   updateScheduledJob,
@@ -16,9 +18,12 @@ import {
   subscribeToJobs,
   subscribeToScheduledJobs,
   subscribeToMechanics,
+  subscribeToMechanicDayStatuses,
   getSchedulingConflicts,
   type Job,
   type Mechanic,
+  type MechanicDaySelection,
+  type MechanicDayStatus,
   type ScheduledJob,
 } from "@/lib/database/calendar";
 import {
@@ -36,6 +41,7 @@ import {
   DEFAULT_CALENDAR_HOURS,
   type CalendarHours,
 } from "@/lib/calendar/slots";
+import { getWorkingMechanics } from "@/lib/calendar/mechanic-availability";
 
 /** Format a Date as YYYY-MM-DD in the local timezone — avoids the UTC shift of toISOString(). */
 export function formatLocalDate(date: Date): string {
@@ -51,6 +57,8 @@ interface DragOverlayData {
 interface UseCalendarDataReturn {
   // Data
   mechanics: Mechanic[];
+  allMechanics: Mechanic[];
+  mechanicDayStatuses: MechanicDayStatus[];
   scheduledJobs: ScheduledJob[];
   scheduledWorkOrders: Record<string, LightspeedWorkOrder>;
   workOrders: LightspeedWorkOrder[];
@@ -74,6 +82,7 @@ interface UseCalendarDataReturn {
   // CRUD
   removeScheduledJob: (scheduledJobId: string) => Promise<void>;
   resizeScheduledJob: (scheduledJobId: string, duration: number) => Promise<boolean>;
+  saveMechanicDayStatuses: (selections: MechanicDaySelection[]) => Promise<void>;
 }
 
 export function useCalendarData(
@@ -85,7 +94,10 @@ export function useCalendarData(
   const [scheduledWorkOrders, setScheduledWorkOrders] = useState<
     Record<string, LightspeedWorkOrder>
   >({});
-  const [mechanics, setMechanics] = useState<Mechanic[]>([]);
+  const [allMechanics, setAllMechanics] = useState<Mechanic[]>([]);
+  const [mechanicDayStatuses, setMechanicDayStatusesState] = useState<
+    MechanicDayStatus[]
+  >([]);
   const [allWorkOrders, setAllWorkOrders] = useState<LightspeedWorkOrder[]>([]);
   const [workOrders, setWorkOrders] = useState<LightspeedWorkOrder[]>([]);
   const [loadingGrid, setLoadingGrid] = useState(true);
@@ -95,6 +107,10 @@ export function useCalendarData(
   const [workOrdersDate, setWorkOrdersDate] = useState(new Date());
   const [activeDragOverlay, setActiveDragOverlay] = useState<DragOverlayData | null>(null);
   const [isDraggingScheduledJob, setIsDraggingScheduledJob] = useState(false);
+  const mechanics = useMemo(
+    () => getWorkingMechanics(allMechanics, mechanicDayStatuses),
+    [allMechanics, mechanicDayStatuses],
+  );
   const scheduledWorkorderIdsKey = useMemo(
     () =>
       [...new Set(scheduledJobs.map((item) => item.job.workorder_id))]
@@ -125,20 +141,32 @@ export function useCalendarData(
     if (!activeShop) return;
 
     const dateStr = formatLocalDate(currentDate);
+    let cancelled = false;
 
     setLoadingGrid(true);
-    getMechanics()
-      .then(setMechanics)
+    Promise.all([
+      getMechanics(),
+      getMechanicDayStatuses(dateStr),
+      getScheduledJobs(dateStr),
+    ])
+      .then(([mechanicsData, statusesData, scheduledJobsData]) => {
+        if (cancelled) return;
+        setAllMechanics(mechanicsData);
+        setMechanicDayStatusesState(statusesData);
+        setScheduledJobs(scheduledJobsData);
+      })
       .catch(console.error)
-      .finally(() => setLoadingGrid(false));
-
-    getScheduledJobs(dateStr)
-      .then(setScheduledJobs)
-      .catch(console.error);
+      .finally(() => {
+        if (!cancelled) setLoadingGrid(false);
+      });
 
     getWorkorderStatuses(activeShop.id)
       .then(setWorkOrderStatusMap)
       .catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentDate, activeShop]);
 
   // Hydrate scheduled cards with current Lightspeed data. Supabase remains
@@ -262,15 +290,66 @@ export function useCalendarData(
 
     const mechanicsSubscription = subscribeToMechanics(activeShop.id, (payload) => {
       console.log("Mechanics changed:", payload);
-      getMechanics().then(setMechanics).catch(console.error);
+      getMechanics().then(setAllMechanics).catch(console.error);
     });
+
+    const mechanicDayStatusesSubscription = subscribeToMechanicDayStatuses(
+      activeShop.id,
+      (payload) => {
+        console.log("Mechanic day statuses changed:", payload);
+        getMechanicDayStatuses(formatLocalDate(currentDateRef.current))
+          .then(setMechanicDayStatusesState)
+          .catch(console.error);
+      },
+    );
 
     return () => {
       jobsSubscription.unsubscribe();
       scheduledJobsSubscription.unsubscribe();
       mechanicsSubscription.unsubscribe();
+      mechanicDayStatusesSubscription.unsubscribe();
     };
   }, [activeShop]);
+
+  const saveMechanicDayStatuses = useCallback(async (
+    selections: MechanicDaySelection[],
+  ) => {
+    if (!activeShop) throw new Error("No active shop");
+
+    const unavailableMechanicIds = new Set(
+      selections
+        .filter((selection) => !selection.is_working)
+        .map((selection) => selection.mechanic_id),
+    );
+    const conflicts = allMechanics
+      .filter(
+        (mechanic) =>
+          unavailableMechanicIds.has(mechanic.id) &&
+          scheduledJobs.some((job) => job.mechanic_id === mechanic.id),
+      )
+      .map((mechanic) => {
+        const count = scheduledJobs.filter(
+          (job) => job.mechanic_id === mechanic.id,
+        ).length;
+        return `${mechanic.name} has ${count} scheduled ${count === 1 ? "job" : "jobs"}`;
+      });
+
+    if (conflicts.length > 0) {
+      throw new Error(
+        `${conflicts.join("; ")}. Reassign or unschedule them before marking the mechanic as not working.`,
+      );
+    }
+
+    const savedStatuses = await setMechanicDayStatuses(
+      activeShop.id,
+      formatLocalDate(currentDate),
+      selections,
+    );
+    setMechanicDayStatusesState((current) => [
+      ...current.filter((status) => status.source !== "manual"),
+      ...savedStatuses,
+    ]);
+  }, [activeShop, allMechanics, currentDate, scheduledJobs]);
 
   const navigateDate = (direction: "prev" | "next") => {
     const newDate = new Date(currentDate);
@@ -584,6 +663,8 @@ export function useCalendarData(
 
   return {
     mechanics,
+    allMechanics,
+    mechanicDayStatuses,
     scheduledJobs,
     scheduledWorkOrders,
     workOrders,
@@ -603,5 +684,6 @@ export function useCalendarData(
     handleDragCancel,
     removeScheduledJob,
     resizeScheduledJob,
+    saveMechanicDayStatuses,
   };
 }

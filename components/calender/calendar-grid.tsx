@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { Calendar as CalendarIcon, X } from "lucide-react";
+import { Calendar as CalendarIcon, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import DropZone from "./drop-zone";
@@ -27,6 +27,7 @@ interface CalendarGridProps {
   currentDate: Date;
   loadingGrid: boolean;
   showDatePicker: boolean;
+  mechanicDayFilter: React.ReactNode;
   headerScrollRef: React.RefObject<HTMLDivElement | null>;
   contentScrollRef: React.RefObject<HTMLDivElement | null>;
   onNavigateDate: (direction: "prev" | "next") => void;
@@ -55,6 +56,7 @@ export function CalendarGrid({
   currentDate,
   loadingGrid,
   showDatePicker,
+  mechanicDayFilter,
   headerScrollRef,
   contentScrollRef,
   onNavigateDate,
@@ -121,12 +123,7 @@ export function CalendarGrid({
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            className="flex items-center space-x-2 bg-transparent"
-          >
-            <span>FILTERS</span>
-          </Button>
+          {mechanicDayFilter}
         </div>
 
         {/* Scheduler Grid */}
@@ -195,6 +192,19 @@ export function CalendarGrid({
               className="flex-1 min-w-0 flex overflow-x-auto mechanics-scroll-container"
               onScroll={handleScroll}
             >
+              {mechanics.length === 0 ? (
+                <div className="flex min-h-96 flex-1 items-center justify-center bg-white p-8 text-center">
+                  <div>
+                    <Users className="mx-auto mb-3 h-8 w-8 text-gray-400" />
+                    <p className="font-medium text-gray-900">
+                      No mechanics are marked as working
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Use the Mechanics button to update this day.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
               {mechanics.map((mechanic, mechanicIndex) => (
                 <div
                   key={mechanic.id}
