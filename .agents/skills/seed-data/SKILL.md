@@ -58,7 +58,7 @@ If empty (or you want to add more), copy section 6 from `supabase/seed.sql`.
 
 - `supabase/migrations/00000000000004_seed.sql` — work order statuses (reference data)
 - `supabase/seed.sql` — complete test data (auth users, shop, mechanics, memberships, jobs)
-- `.Codex/rules/seeding.md` — full documentation of the seed data architecture
+- `.claude/rules/seeding.md` — full documentation of the seed data architecture
 
 ## UUID scheme
 

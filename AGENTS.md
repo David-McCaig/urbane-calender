@@ -34,7 +34,7 @@ npm run setup-supabase      # Run setup script
 
 ## Architecture conventions
 
-See `.Codex/rules/` for detailed guidance on each area:
+See `.claude/rules/` for detailed guidance on each area:
 
 | Rule file | Covers |
 |---|---|
