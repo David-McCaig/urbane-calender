@@ -24,6 +24,7 @@ export default function Calendar() {
 
   const {
     mechanics,
+    workingMechanicIds,
     allMechanics,
     mechanicDayStatuses,
     scheduledJobs,
@@ -102,6 +103,7 @@ export default function Calendar() {
         <CalendarGrid
           calendarHours={DEFAULT_CALENDAR_HOURS}
           mechanics={mechanics}
+          workingMechanicIds={workingMechanicIds}
           scheduledJobs={scheduledJobs}
           scheduledWorkOrders={scheduledWorkOrders}
           workOrderStatusMap={workOrderStatusMap}

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { getWorkingMechanics } from "@/lib/calendar/mechanic-availability";
-import type { Mechanic, MechanicDayStatus } from "@/lib/database/calendar";
+import {
+  getVisibleMechanics,
+  getWorkingMechanics,
+} from "@/lib/calendar/mechanic-availability";
+import type {
+  Mechanic,
+  MechanicDayStatus,
+  ScheduledJob,
+} from "@/lib/database/calendar";
 
 const mechanics = [
   { id: "one", name: "One" },
@@ -37,5 +44,24 @@ describe("getWorkingMechanics", () => {
     ]);
 
     expect(result.map((mechanic) => mechanic.id)).toEqual(["one"]);
+  });
+});
+
+describe("getVisibleMechanics", () => {
+  it("keeps an unavailable mechanic visible while they have scheduled work", () => {
+    const workingMechanics = [mechanics[0]];
+    const scheduledJobs = [{ mechanic_id: "two" }] as ScheduledJob[];
+
+    expect(
+      getVisibleMechanics(mechanics, workingMechanics, scheduledJobs).map(
+        (mechanic) => mechanic.id,
+      ),
+    ).toEqual(["one", "two"]);
+  });
+
+  it("hides an unavailable mechanic after their scheduled work is removed", () => {
+    expect(getVisibleMechanics(mechanics, [mechanics[0]], [])).toEqual([
+      mechanics[0],
+    ]);
   });
 });

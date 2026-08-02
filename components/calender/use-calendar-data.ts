@@ -41,7 +41,10 @@ import {
   DEFAULT_CALENDAR_HOURS,
   type CalendarHours,
 } from "@/lib/calendar/slots";
-import { getWorkingMechanics } from "@/lib/calendar/mechanic-availability";
+import {
+  getVisibleMechanics,
+  getWorkingMechanics,
+} from "@/lib/calendar/mechanic-availability";
 
 /** Format a Date as YYYY-MM-DD in the local timezone — avoids the UTC shift of toISOString(). */
 export function formatLocalDate(date: Date): string {
@@ -57,6 +60,7 @@ interface DragOverlayData {
 interface UseCalendarDataReturn {
   // Data
   mechanics: Mechanic[];
+  workingMechanicIds: Set<string>;
   allMechanics: Mechanic[];
   mechanicDayStatuses: MechanicDayStatus[];
   scheduledJobs: ScheduledJob[];
@@ -107,9 +111,17 @@ export function useCalendarData(
   const [workOrdersDate, setWorkOrdersDate] = useState(new Date());
   const [activeDragOverlay, setActiveDragOverlay] = useState<DragOverlayData | null>(null);
   const [isDraggingScheduledJob, setIsDraggingScheduledJob] = useState(false);
-  const mechanics = useMemo(
+  const workingMechanics = useMemo(
     () => getWorkingMechanics(allMechanics, mechanicDayStatuses),
     [allMechanics, mechanicDayStatuses],
+  );
+  const workingMechanicIds = useMemo(
+    () => new Set(workingMechanics.map((mechanic) => mechanic.id)),
+    [workingMechanics],
+  );
+  const mechanics = useMemo(
+    () => getVisibleMechanics(allMechanics, workingMechanics, scheduledJobs),
+    [allMechanics, workingMechanics, scheduledJobs],
   );
   const scheduledWorkorderIdsKey = useMemo(
     () =>
@@ -123,6 +135,25 @@ export function useCalendarData(
   // without needing to resubscribe when the date changes.
   const currentDateRef = useRef(currentDate);
   currentDateRef.current = currentDate;
+  const activeShopIdRef = useRef(activeShop?.id ?? null);
+  activeShopIdRef.current = activeShop?.id ?? null;
+  const mechanicStatusRequestIdRef = useRef(0);
+
+  const refreshMechanicDayStatuses = useCallback(async (
+    date: string,
+    shopId: string,
+  ) => {
+    const requestId = ++mechanicStatusRequestIdRef.current;
+    const statuses = await getMechanicDayStatuses(date);
+    if (
+      requestId !== mechanicStatusRequestIdRef.current ||
+      activeShopIdRef.current !== shopId ||
+      formatLocalDate(currentDateRef.current) !== date
+    ) {
+      return;
+    }
+    setMechanicDayStatusesState(statuses);
+  }, []);
 
   // Keep a ref to allWorkOrders so handleDragEnd can check Lightspeed origin
   const allWorkOrdersRef = useRef(allWorkOrders);
@@ -146,13 +177,12 @@ export function useCalendarData(
     setLoadingGrid(true);
     Promise.all([
       getMechanics(),
-      getMechanicDayStatuses(dateStr),
+      refreshMechanicDayStatuses(dateStr, activeShop.id),
       getScheduledJobs(dateStr),
     ])
-      .then(([mechanicsData, statusesData, scheduledJobsData]) => {
+      .then(([mechanicsData, , scheduledJobsData]) => {
         if (cancelled) return;
         setAllMechanics(mechanicsData);
-        setMechanicDayStatusesState(statusesData);
         setScheduledJobs(scheduledJobsData);
       })
       .catch(console.error)
@@ -167,7 +197,7 @@ export function useCalendarData(
     return () => {
       cancelled = true;
     };
-  }, [currentDate, activeShop]);
+  }, [currentDate, activeShop, refreshMechanicDayStatuses]);
 
   // Hydrate scheduled cards with current Lightspeed data. Supabase remains
   // responsible only for placement and duration.
@@ -297,9 +327,10 @@ export function useCalendarData(
       activeShop.id,
       (payload) => {
         console.log("Mechanic day statuses changed:", payload);
-        getMechanicDayStatuses(formatLocalDate(currentDateRef.current))
-          .then(setMechanicDayStatusesState)
-          .catch(console.error);
+        refreshMechanicDayStatuses(
+          formatLocalDate(currentDateRef.current),
+          activeShop.id,
+        ).catch(console.error);
       },
     );
 
@@ -309,7 +340,7 @@ export function useCalendarData(
       mechanicsSubscription.unsubscribe();
       mechanicDayStatusesSubscription.unsubscribe();
     };
-  }, [activeShop]);
+  }, [activeShop, refreshMechanicDayStatuses]);
 
   const saveMechanicDayStatuses = useCallback(async (
     selections: MechanicDaySelection[],
@@ -345,8 +376,16 @@ export function useCalendarData(
       formatLocalDate(currentDate),
       selections,
     );
+    mechanicStatusRequestIdRef.current += 1;
+    const savedMechanicIds = new Set(
+      savedStatuses.map((status) => status.mechanic_id),
+    );
     setMechanicDayStatusesState((current) => [
-      ...current.filter((status) => status.source !== "manual"),
+      ...current.filter(
+        (status) =>
+          status.source !== "manual" ||
+          !savedMechanicIds.has(status.mechanic_id),
+      ),
       ...savedStatuses,
     ]);
   }, [activeShop, allMechanics, currentDate, scheduledJobs]);
@@ -462,6 +501,12 @@ export function useCalendarData(
 
     if (mechanicIndex >= mechanicsList.length) {
       alert("Invalid mechanic selection");
+      return;
+    }
+
+    const targetMechanic = mechanicsList[mechanicIndex];
+    if (!workingMechanicIds.has(targetMechanic.id)) {
+      alert(`${targetMechanic.name} is not working on this day.`);
       return;
     }
 
@@ -663,6 +708,7 @@ export function useCalendarData(
 
   return {
     mechanics,
+    workingMechanicIds,
     allMechanics,
     mechanicDayStatuses,
     scheduledJobs,

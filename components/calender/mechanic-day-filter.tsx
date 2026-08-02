@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Users, X } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -30,21 +30,45 @@ export function MechanicDayFilter({
     [mechanics, statuses],
   );
   const [isOpen, setIsOpen] = useState(false);
+  const [baselineIds, setBaselineIds] = useState<Set<string>>(workingIds);
   const [draftIds, setDraftIds] = useState<Set<string>>(workingIds);
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const openEditor = () => {
+    setBaselineIds(new Set(workingIds));
     setDraftIds(new Set(workingIds));
+    setDirtyIds(new Set());
     setError(null);
     setIsOpen(true);
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setBaselineIds(new Set(workingIds));
+    setDraftIds((currentDraft) => {
+      const mergedDraft = new Set(workingIds);
+      for (const mechanicId of dirtyIds) {
+        if (currentDraft.has(mechanicId)) mergedDraft.add(mechanicId);
+        else mergedDraft.delete(mechanicId);
+      }
+      return mergedDraft;
+    });
+  }, [dirtyIds, isOpen, workingIds]);
 
   const toggleMechanic = (mechanicId: string, checked: boolean) => {
     setDraftIds((current) => {
       const next = new Set(current);
       if (checked) next.add(mechanicId);
       else next.delete(mechanicId);
+      return next;
+    });
+    setDirtyIds((current) => {
+      const next = new Set(current);
+      if (checked === baselineIds.has(mechanicId)) next.delete(mechanicId);
+      else next.add(mechanicId);
       return next;
     });
     setError(null);
@@ -55,10 +79,12 @@ export function MechanicDayFilter({
     setError(null);
     try {
       await onSave(
-        mechanics.map((mechanic) => ({
-          mechanic_id: mechanic.id,
-          is_working: draftIds.has(mechanic.id),
-        })),
+        mechanics
+          .filter((mechanic) => dirtyIds.has(mechanic.id))
+          .map((mechanic) => ({
+            mechanic_id: mechanic.id,
+            is_working: draftIds.has(mechanic.id),
+          })),
       );
       setIsOpen(false);
     } catch (saveError) {
@@ -160,7 +186,10 @@ export function MechanicDayFilter({
               <Button variant="outline" onClick={() => setIsOpen(false)} disabled={isSaving}>
                 Cancel
               </Button>
-              <Button onClick={save} disabled={isSaving || mechanics.length === 0}>
+              <Button
+                onClick={save}
+                disabled={isSaving || mechanics.length === 0 || dirtyIds.size === 0}
+              >
                 {isSaving ? <Loader2 className="animate-spin" /> : null}
                 Save
               </Button>
