@@ -3,15 +3,22 @@ import { useDraggable } from "@dnd-kit/core";
 import type { ScheduledJob } from "@/lib/database/calendar";
 import type { JobCardData } from "@/components/calender/job-card-content";
 import { JobCardContent } from "@/components/calender/job-card-content";
+import {
+  durationHoursToSlots,
+  SLOTS_PER_HOUR,
+  type CalendarHours,
+} from "@/lib/calendar/slots";
 
 export function ScheduledJobBlock({
   scheduledJob,
+  calendarHours,
   cardData,
   onRemove,
   onViewDetails,
   onResize,
 }: {
   scheduledJob: ScheduledJob;
+  calendarHours: CalendarHours;
   cardData: JobCardData;
   onRemove: () => void;
   onViewDetails: () => void;
@@ -29,23 +36,23 @@ export function ScheduledJobBlock({
       }
     : undefined;
 
-  const topPosition = scheduledJob.time_slot * 20;
+  const topPosition = (scheduledJob.time_slot - calendarHours.startSlot) * 20;
   const displayedDuration = resizeDuration ?? scheduledJob.job.duration;
-  const height = displayedDuration * 4 * 20;
+  const height = displayedDuration * SLOTS_PER_HOUR * 20;
 
   const handleResizeStart = (event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
 
     const startY = event.clientY;
-    const initialSlots = Math.round(scheduledJob.job.duration * 4);
-    const maximumSlots = 32 - scheduledJob.time_slot;
+    const initialSlots = durationHoursToSlots(scheduledJob.job.duration);
+    const maximumSlots = calendarHours.endSlot - scheduledJob.time_slot;
     let nextSlots = initialSlots;
 
     const handlePointerMove = (pointerEvent: PointerEvent) => {
       const slotDelta = Math.round((pointerEvent.clientY - startY) / 20);
       nextSlots = Math.min(maximumSlots, Math.max(1, initialSlots + slotDelta));
-      setResizeDuration(nextSlots / 4);
+      setResizeDuration(nextSlots / SLOTS_PER_HOUR);
     };
 
     const handlePointerUp = async () => {
@@ -53,7 +60,7 @@ export function ScheduledJobBlock({
       window.removeEventListener("pointerup", handlePointerUp);
 
       if (nextSlots !== initialSlots) {
-        await onResize(nextSlots / 4);
+        await onResize(nextSlots / SLOTS_PER_HOUR);
       }
       setResizeDuration(null);
     };

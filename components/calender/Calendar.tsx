@@ -8,6 +8,7 @@ import {
   closestCenter,
 } from "@dnd-kit/core";
 import { useActiveShop } from "@/lib/context/shop-context";
+import { DEFAULT_CALENDAR_HOURS } from "@/lib/calendar/slots";
 import { useCalendarData } from "./use-calendar-data";
 import { CalendarGrid } from "./calendar-grid";
 import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
@@ -41,7 +42,7 @@ export default function Calendar() {
     handleDragCancel,
     removeScheduledJob,
     resizeScheduledJob,
-  } = useCalendarData(activeShop);
+  } = useCalendarData(activeShop, DEFAULT_CALENDAR_HOURS);
 
   // UI-only local state
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -58,7 +59,7 @@ export default function Calendar() {
       <div className="h-[calc(100vh-3.5rem)] bg-gray-50 flex">
         <div className="w-[70%] flex-shrink-0">
           <main className="p-6">
-            <CalendarGridSkeleton />
+            <CalendarGridSkeleton calendarHours={DEFAULT_CALENDAR_HOURS} />
           </main>
         </div>
       </div>
@@ -95,6 +96,7 @@ export default function Calendar() {
     >
       <div className="h-[calc(100vh-3.5rem)] bg-gray-50 flex">
         <CalendarGrid
+          calendarHours={DEFAULT_CALENDAR_HOURS}
           mechanics={mechanics}
           scheduledJobs={scheduledJobs}
           scheduledWorkOrders={scheduledWorkOrders}

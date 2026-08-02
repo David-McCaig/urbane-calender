@@ -1,4 +1,10 @@
 import { createClient } from '@/lib/supabase/client';
+import {
+  durationHoursToSlots,
+  formatSlotLabel,
+  SLOTS_PER_DAY,
+  type CalendarHours,
+} from '@/lib/calendar/slots';
 
 export interface Job {
   id: string;
@@ -314,13 +320,22 @@ export function getSchedulingConflicts(
   mechanicIndex: number,
   timeSlot: number,
   existingJobs: ScheduledJob[],
-  mechanics: Mechanic[]
+  mechanics: Mechanic[],
+  calendarHours: CalendarHours,
 ): string[] {
   const conflicts: string[] = [];
-  const jobEndTime = timeSlot + job.duration * 4; // 4 slots per hour
+  const jobEndTime = timeSlot + durationHoursToSlots(job.duration);
 
-  if (jobEndTime > 32) {
-    conflicts.push("Job extends beyond work hours (6 PM)");
+  if (timeSlot < calendarHours.startSlot) {
+    conflicts.push(
+      `Job starts before work hours (${formatSlotLabel(calendarHours.startSlot)})`,
+    );
+  }
+
+  if (jobEndTime > calendarHours.endSlot) {
+    conflicts.push(
+      `Job extends beyond work hours (${formatSlotLabel(calendarHours.endSlot % SLOTS_PER_DAY)})`,
+    );
   }
 
   const targetMechanicId = mechanics[mechanicIndex]?.id;
@@ -328,7 +343,8 @@ export function getSchedulingConflicts(
     if (existingJob.mechanic_id !== targetMechanicId) return false;
 
     const existingStart = existingJob.time_slot;
-    const existingEnd = existingJob.time_slot + existingJob.job.duration * 4;
+    const existingEnd =
+      existingJob.time_slot + durationHoursToSlots(existingJob.job.duration);
 
     return timeSlot < existingEnd && jobEndTime > existingStart;
   });
