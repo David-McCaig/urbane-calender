@@ -41,6 +41,7 @@ export default function Calendar() {
     handleDragEnd,
     handleDragCancel,
     removeScheduledJob,
+    resizeScheduledJob,
   } = useCalendarData(activeShop);
 
   // UI-only local state
@@ -112,6 +113,7 @@ export default function Calendar() {
             setShowDatePicker(false);
           }}
           onRemoveScheduledJob={removeScheduledJob}
+          onResizeScheduledJob={resizeScheduledJob}
           onViewWorkOrder={setDetailsSelection}
         />
 
