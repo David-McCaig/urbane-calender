@@ -32,6 +32,10 @@ import {
   shouldRetryHydration,
 } from "@/lib/lightspeed/work-order-hydration";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
+import {
+  DEFAULT_CALENDAR_HOURS,
+  type CalendarHours,
+} from "@/lib/calendar/slots";
 
 /** Format a Date as YYYY-MM-DD in the local timezone — avoids the UTC shift of toISOString(). */
 export function formatLocalDate(date: Date): string {
@@ -72,7 +76,10 @@ interface UseCalendarDataReturn {
   resizeScheduledJob: (scheduledJobId: string, duration: number) => Promise<boolean>;
 }
 
-export function useCalendarData(activeShop: { id: string } | null): UseCalendarDataReturn {
+export function useCalendarData(
+  activeShop: { id: string } | null,
+  calendarHours: CalendarHours = DEFAULT_CALENDAR_HOURS,
+): UseCalendarDataReturn {
   const [existingWorkorderIds, setExistingWorkorderIds] = useState<Set<string>>(new Set());
   const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
   const [scheduledWorkOrders, setScheduledWorkOrders] = useState<
@@ -422,6 +429,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
           timeSlot,
           scheduledJobs,
           mechanicsList,
+          calendarHours,
         );
         if (conflicts.length > 0) {
           alert(`Cannot schedule job: ${conflicts.join(", ")}`);
@@ -466,6 +474,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       timeSlot,
       otherScheduledJobs,
       mechanicsList,
+      calendarHours,
     );
 
     if (conflicts.length > 0) {
@@ -545,6 +554,7 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       scheduledJob.time_slot,
       scheduledJobs.filter((item) => item.id !== scheduledJobId),
       mechanics,
+      calendarHours,
     );
 
     if (conflicts.length > 0) {

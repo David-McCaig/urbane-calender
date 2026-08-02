@@ -11,8 +11,15 @@ import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
 import type { Mechanic, ScheduledJob } from "@/lib/database/calendar";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 import type { WorkOrderDetailsSelection } from "@/components/calender/work-order-details-dialog";
+import {
+  formatSlotLabel,
+  getVisibleSlots,
+  MINUTES_PER_SLOT,
+  type CalendarHours,
+} from "@/lib/calendar/slots";
 
 interface CalendarGridProps {
+  calendarHours: CalendarHours;
   mechanics: Mechanic[];
   scheduledJobs: ScheduledJob[];
   scheduledWorkOrders: Record<string, LightspeedWorkOrder>;
@@ -40,6 +47,7 @@ function formatDate(date: Date) {
 }
 
 export function CalendarGrid({
+  calendarHours,
   mechanics,
   scheduledJobs,
   scheduledWorkOrders,
@@ -60,7 +68,7 @@ export function CalendarGrid({
     return (
       <div className="w-[70%] flex-shrink-0">
         <main className="p-6">
-          <CalendarGridSkeleton />
+          <CalendarGridSkeleton calendarHours={calendarHours} />
         </main>
       </div>
     );
@@ -72,6 +80,7 @@ export function CalendarGrid({
       headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
     }
   };
+  const visibleSlots = getVisibleSlots(calendarHours);
 
   return (
     <div className="w-[70%] flex-shrink-0">
@@ -161,28 +170,18 @@ export function CalendarGrid({
           <div className="flex">
             {/* Time slots column */}
             <div className="w-20 border-r bg-gray-50/50 flex-shrink-0">
-              {Array.from({ length: 32 }, (_, index) => {
-                const totalMinutes = 10 * 60 + index * 15;
-                const hour = Math.floor(totalMinutes / 60);
-                const minutes = totalMinutes % 60;
+              {visibleSlots.map((slot) => {
+                const minutes = (slot * MINUTES_PER_SLOT) % 60;
                 const showLabel = minutes === 0 || minutes === 30;
-
-                let timeLabel = "";
-                if (showLabel) {
-                  const displayHour =
-                    hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-                  const period = hour >= 12 ? "PM" : "AM";
-                  timeLabel = `${displayHour}${minutes === 30 ? ":30" : ""} ${period}`;
-                }
 
                 return (
                   <div
-                    key={index}
+                    key={slot}
                     className="h-5 border-b border-gray-100 flex items-center justify-center"
                   >
                     {showLabel && (
                       <span className="text-xs font-medium text-gray-600">
-                        {timeLabel}
+                        {formatSlotLabel(slot)}
                       </span>
                     )}
                   </div>
@@ -201,10 +200,10 @@ export function CalendarGrid({
                   key={mechanic.id}
                   className="min-w-[192px] flex-1 border-r last:border-r-0 relative"
                 >
-                  {Array.from({ length: 32 }, (_, timeIndex) => (
+                  {visibleSlots.map((slot) => (
                     <DropZone
-                      key={timeIndex}
-                      id={`slot-${mechanicIndex}-${timeIndex}`}
+                      key={slot}
+                      id={`slot-${mechanicIndex}-${slot}`}
                       className="h-5 border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors relative"
                     />
                   ))}
@@ -212,12 +211,15 @@ export function CalendarGrid({
                   {scheduledJobs
                     .filter(
                       (scheduledJob) =>
-                        scheduledJob.mechanic_id === mechanic.id
+                        scheduledJob.mechanic_id === mechanic.id &&
+                        scheduledJob.time_slot >= calendarHours.startSlot &&
+                        scheduledJob.time_slot < calendarHours.endSlot
                     )
                     .map((scheduledJob) => (
                       <ScheduledJobBlock
                         key={scheduledJob.id}
                         scheduledJob={scheduledJob}
+                        calendarHours={calendarHours}
                         cardData={(() => {
                           const workOrder =
                             scheduledWorkOrders[scheduledJob.job.workorder_id];

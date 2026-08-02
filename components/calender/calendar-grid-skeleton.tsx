@@ -1,7 +1,20 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DEFAULT_CALENDAR_HOURS,
+  formatSlotLabel,
+  getVisibleSlots,
+  MINUTES_PER_SLOT,
+  type CalendarHours,
+} from "@/lib/calendar/slots";
 
-export function CalendarGridSkeleton() {
+export function CalendarGridSkeleton({
+  calendarHours = DEFAULT_CALENDAR_HOURS,
+}: {
+  calendarHours?: CalendarHours;
+}) {
+  const visibleSlots = getVisibleSlots(calendarHours);
+
   return (
     <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
       {/* Header Row */}
@@ -31,27 +44,18 @@ export function CalendarGridSkeleton() {
       <div className="flex">
         {/* Time slots column */}
         <div className="w-20 border-r bg-gray-50/50 flex-shrink-0">
-          {Array.from({ length: 32 }, (_, index) => {
-            const totalMinutes = 10 * 60 + index * 15;
-            const hour = Math.floor(totalMinutes / 60);
-            const minutes = totalMinutes % 60;
+          {visibleSlots.map((slot) => {
+            const minutes = (slot * MINUTES_PER_SLOT) % 60;
             const showLabel = minutes === 0 || minutes === 30;
-
-            let timeLabel = "";
-            if (showLabel) {
-              const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-              const period = hour >= 12 ? "PM" : "AM";
-              timeLabel = `${displayHour}${minutes === 30 ? ":30" : ""} ${period}`;
-            }
 
             return (
               <div
-                key={index}
+                key={slot}
                 className="h-5 border-b border-gray-100 flex items-center justify-center"
               >
                 {showLabel && (
                   <span className="text-xs font-medium text-gray-400">
-                    {timeLabel}
+                    {formatSlotLabel(slot)}
                   </span>
                 )}
               </div>
@@ -66,9 +70,9 @@ export function CalendarGridSkeleton() {
               key={colIndex}
               className="min-w-[192px] flex-1 border-r last:border-r-0"
             >
-              {Array.from({ length: 32 }, (_, timeIndex) => (
+              {visibleSlots.map((slot) => (
                 <div
-                  key={timeIndex}
+                  key={slot}
                   className="h-5 border-b border-gray-100"
                 />
               ))}
