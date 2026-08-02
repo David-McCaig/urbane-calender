@@ -57,7 +57,6 @@ interface UseCalendarDataReturn {
   currentDate: Date;
   setCurrentDate: (date: Date) => void;
   navigateDate: (direction: "prev" | "next") => void;
-  goToToday: () => void;
   // Date (work orders sidebar — independent from grid)
   workOrdersDate: Date;
   setWorkOrdersDate: (date: Date) => void;
@@ -274,10 +273,6 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       newDate.setDate(newDate.getDate() + 1);
     }
     setCurrentDate(newDate);
-  };
-
-  const goToToday = () => {
-    setCurrentDate(new Date());
   };
 
   const navigateWorkOrdersDate = (direction: "prev" | "next") => {
@@ -588,7 +583,6 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
     currentDate,
     setCurrentDate,
     navigateDate,
-    goToToday,
     workOrdersDate,
     setWorkOrdersDate,
     navigateWorkOrdersDate,

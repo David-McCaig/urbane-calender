@@ -31,7 +31,6 @@ export default function Calendar() {
     currentDate,
     setCurrentDate,
     navigateDate,
-    goToToday,
     workOrdersDate,
     setWorkOrdersDate,
     navigateWorkOrdersDate,
@@ -106,7 +105,6 @@ export default function Calendar() {
           headerScrollRef={headerScrollRef}
           contentScrollRef={contentScrollRef}
           onNavigateDate={navigateDate}
-          onGoToToday={goToToday}
           onToggleDatePicker={() => setShowDatePicker(!showDatePicker)}
           onDateSelect={(date) => {
             setCurrentDate(date);
@@ -123,7 +121,6 @@ export default function Calendar() {
           loadingWorkOrders={loadingWorkOrders}
           currentDate={workOrdersDate}
           onNavigateDate={navigateWorkOrdersDate}
-          onGoToToday={() => setWorkOrdersDate(new Date())}
           onDateSelect={setWorkOrdersDate}
           isDraggingScheduledJob={isDraggingScheduledJob}
           onViewWorkOrder={(workOrder, statusName) =>

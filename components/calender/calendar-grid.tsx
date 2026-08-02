@@ -23,7 +23,6 @@ interface CalendarGridProps {
   headerScrollRef: React.RefObject<HTMLDivElement | null>;
   contentScrollRef: React.RefObject<HTMLDivElement | null>;
   onNavigateDate: (direction: "prev" | "next") => void;
-  onGoToToday: () => void;
   onToggleDatePicker: () => void;
   onDateSelect: (date: Date) => void;
   onRemoveScheduledJob: (id: string) => void;
@@ -51,7 +50,6 @@ export function CalendarGrid({
   headerScrollRef,
   contentScrollRef,
   onNavigateDate,
-  onGoToToday,
   onToggleDatePicker,
   onDateSelect,
   onRemoveScheduledJob,
@@ -111,36 +109,15 @@ export function CalendarGrid({
               >
                 →
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onGoToToday}
-                className="ml-2 text-xs hover:bg-blue-50 hover:text-blue-700"
-              >
-                Today
-              </Button>
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="outline"
-              className="flex items-center space-x-2 bg-transparent"
-            >
-              <span>FILTERS</span>
-            </Button>
-            <div className="flex bg-white border rounded-lg">
-              <Button
-                variant="default"
-                className="bg-slate-800 text-white hover:bg-slate-700"
-              >
-                DAY
-              </Button>
-              <Button variant="ghost" className="text-gray-600">
-                WEEK
-              </Button>
-            </div>
-          </div>
+          <Button
+            variant="outline"
+            className="flex items-center space-x-2 bg-transparent"
+          >
+            <span>FILTERS</span>
+          </Button>
         </div>
 
         {/* Scheduler Grid */}
