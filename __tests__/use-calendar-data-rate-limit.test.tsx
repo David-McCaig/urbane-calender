@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getJobByWorkorderId: vi.fn(),
   createJob: vi.fn(),
   getMechanics: vi.fn(),
+  getMechanicDayStatuses: vi.fn(),
+  setMechanicDayStatuses: vi.fn(),
   getScheduledJobs: vi.fn(),
   createScheduledJob: vi.fn(),
   updateScheduledJob: vi.fn(),
@@ -14,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   subscribeToJobs: vi.fn(),
   subscribeToScheduledJobs: vi.fn(),
   subscribeToMechanics: vi.fn(),
+  subscribeToMechanicDayStatuses: vi.fn(),
   getSchedulingConflicts: vi.fn(),
   getWorkOrdersByDate: vi.fn(),
   getWorkOrdersByIds: vi.fn(),
@@ -25,6 +28,8 @@ vi.mock("@/lib/database/calendar", () => ({
   getJobByWorkorderId: mocks.getJobByWorkorderId,
   createJob: mocks.createJob,
   getMechanics: mocks.getMechanics,
+  getMechanicDayStatuses: mocks.getMechanicDayStatuses,
+  setMechanicDayStatuses: mocks.setMechanicDayStatuses,
   getScheduledJobs: mocks.getScheduledJobs,
   createScheduledJob: mocks.createScheduledJob,
   updateScheduledJob: mocks.updateScheduledJob,
@@ -33,6 +38,7 @@ vi.mock("@/lib/database/calendar", () => ({
   subscribeToJobs: mocks.subscribeToJobs,
   subscribeToScheduledJobs: mocks.subscribeToScheduledJobs,
   subscribeToMechanics: mocks.subscribeToMechanics,
+  subscribeToMechanicDayStatuses: mocks.subscribeToMechanicDayStatuses,
   getSchedulingConflicts: mocks.getSchedulingConflicts,
 }));
 
@@ -46,10 +52,13 @@ import { useCalendarData } from "@/components/calender/use-calendar-data";
 import type { WorkOrderHydrationResult } from "@/lib/actions/light-speed";
 
 describe("useCalendarData hydration cleanup", () => {
+  let mechanicDayStatusCallback: (() => void) | undefined;
+
   beforeEach(() => {
     const subscription = () => ({ unsubscribe: vi.fn() });
 
     mocks.getMechanics.mockResolvedValue([]);
+    mocks.getMechanicDayStatuses.mockResolvedValue([]);
     mocks.getScheduledJobs.mockResolvedValue([
       {
         id: "scheduled-1",
@@ -65,6 +74,12 @@ describe("useCalendarData hydration cleanup", () => {
     mocks.subscribeToJobs.mockImplementation(subscription);
     mocks.subscribeToScheduledJobs.mockImplementation(subscription);
     mocks.subscribeToMechanics.mockImplementation(subscription);
+    mocks.subscribeToMechanicDayStatuses.mockImplementation(
+      (_shopId: string, callback: () => void) => {
+        mechanicDayStatusCallback = callback;
+        return subscription();
+      },
+    );
     mocks.getSchedulingConflicts.mockReturnValue([]);
   });
 
@@ -106,5 +121,54 @@ describe("useCalendarData hydration cleanup", () => {
     });
 
     expect(mocks.getWorkOrdersByIds).toHaveBeenCalledTimes(1);
+  });
+
+  it("discards a realtime status response after navigating to another day", async () => {
+    mocks.getScheduledJobs.mockResolvedValue([]);
+    mocks.getWorkOrdersByIds.mockResolvedValue({
+      status: "ok",
+      orders: [],
+      retryAfter: null,
+      retryable: false,
+    });
+    const activeShop = { id: "shop-1" };
+    const { result } = renderHook(() => useCalendarData(activeShop));
+
+    await waitFor(() => {
+      expect(mechanicDayStatusCallback).toBeTypeOf("function");
+      expect(mocks.getMechanicDayStatuses).toHaveBeenCalledTimes(1);
+    });
+
+    let resolveOldRequest!: (statuses: never[]) => void;
+    mocks.getMechanicDayStatuses.mockImplementationOnce(
+      () => new Promise<never[]>((resolve) => {
+        resolveOldRequest = resolve;
+      }),
+    );
+    act(() => mechanicDayStatusCallback?.());
+
+    const nextDayStatus = {
+      id: "next-day",
+      shop_id: "shop-1",
+      mechanic_id: "mechanic-1",
+      date: "2099-01-02",
+      is_working: false,
+      source: "manual",
+      created_at: "2099-01-02T00:00:00Z",
+      updated_at: "2099-01-02T00:00:00Z",
+    };
+    mocks.getMechanicDayStatuses.mockResolvedValueOnce([nextDayStatus]);
+    act(() => result.current.setCurrentDate(new Date(2099, 0, 2)));
+
+    await waitFor(() => {
+      expect(result.current.mechanicDayStatuses).toEqual([nextDayStatus]);
+    });
+
+    await act(async () => {
+      resolveOldRequest([]);
+      await Promise.resolve();
+    });
+
+    expect(result.current.mechanicDayStatuses).toEqual([nextDayStatus]);
   });
 });

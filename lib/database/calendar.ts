@@ -34,6 +34,24 @@ export interface Mechanic {
   updated_at: string;
 }
 
+export type MechanicDayStatusSource = 'manual' | 'when_i_work';
+
+export interface MechanicDayStatus {
+  id: string;
+  shop_id: string;
+  mechanic_id: string;
+  date: string;
+  is_working: boolean;
+  source: MechanicDayStatusSource;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MechanicDaySelection {
+  mechanic_id: string;
+  is_working: boolean;
+}
+
 export interface ScheduledJob {
   id: string;
   job_id: string;
@@ -182,6 +200,51 @@ export async function createMechanic(mechanicData: Omit<Mechanic, 'id' | 'create
   return data;
 }
 
+export async function getMechanicDayStatuses(
+  date: string,
+): Promise<MechanicDayStatus[]> {
+  const { data, error } = await supabase
+    .from('mechanic_day_statuses')
+    .select('id, shop_id, mechanic_id, date, is_working, source, created_at, updated_at')
+    .eq('date', date);
+
+  if (error) {
+    console.error('Error fetching mechanic day statuses:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+export async function setMechanicDayStatuses(
+  shopId: string,
+  date: string,
+  selections: MechanicDaySelection[],
+): Promise<MechanicDayStatus[]> {
+  if (selections.length === 0) return [];
+
+  const rows = selections.map((selection) => ({
+    shop_id: shopId,
+    mechanic_id: selection.mechanic_id,
+    date,
+    is_working: selection.is_working,
+    source: 'manual' as const,
+  }));
+  const { data, error } = await supabase
+    .from('mechanic_day_statuses')
+    .upsert(rows, {
+      onConflict: 'shop_id,mechanic_id,date,source',
+    })
+    .select('id, shop_id, mechanic_id, date, is_working, source, created_at, updated_at');
+
+  if (error) {
+    console.error('Error saving mechanic day statuses:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
 // Scheduled Jobs CRUD operations
 export async function getScheduledJobs(date: string): Promise<ScheduledJob[]> {
   const { data, error } = await supabase
@@ -309,6 +372,21 @@ export function subscribeToMechanics(shopId: string, callback: (payload: any) =>
       event: '*',
       schema: 'public',
       table: 'mechanics',
+      filter: `shop_id=eq.${shopId}`,
+    }, callback)
+    .subscribe();
+}
+
+export function subscribeToMechanicDayStatuses(
+  shopId: string,
+  callback: (payload: any) => void,
+) {
+  return supabase
+    .channel(`mechanic_day_statuses_changes_${shopId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'mechanic_day_statuses',
       filter: `shop_id=eq.${shopId}`,
     }, callback)
     .subscribe();

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { Calendar as CalendarIcon, X } from "lucide-react";
+import { Calendar as CalendarIcon, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import DropZone from "./drop-zone";
@@ -11,6 +11,7 @@ import { CalendarGridSkeleton } from "./calendar-grid-skeleton";
 import type { Mechanic, ScheduledJob } from "@/lib/database/calendar";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 import type { WorkOrderDetailsSelection } from "@/components/calender/work-order-details-dialog";
+import { cn } from "@/lib/utils";
 import {
   formatSlotLabel,
   getVisibleSlots,
@@ -21,12 +22,14 @@ import {
 interface CalendarGridProps {
   calendarHours: CalendarHours;
   mechanics: Mechanic[];
+  workingMechanicIds: Set<string>;
   scheduledJobs: ScheduledJob[];
   scheduledWorkOrders: Record<string, LightspeedWorkOrder>;
   workOrderStatusMap: WorkOrderStatusMap;
   currentDate: Date;
   loadingGrid: boolean;
   showDatePicker: boolean;
+  mechanicDayFilter: React.ReactNode;
   headerScrollRef: React.RefObject<HTMLDivElement | null>;
   contentScrollRef: React.RefObject<HTMLDivElement | null>;
   onNavigateDate: (direction: "prev" | "next") => void;
@@ -49,12 +52,14 @@ function formatDate(date: Date) {
 export function CalendarGrid({
   calendarHours,
   mechanics,
+  workingMechanicIds,
   scheduledJobs,
   scheduledWorkOrders,
   workOrderStatusMap,
   currentDate,
   loadingGrid,
   showDatePicker,
+  mechanicDayFilter,
   headerScrollRef,
   contentScrollRef,
   onNavigateDate,
@@ -121,12 +126,7 @@ export function CalendarGrid({
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            className="flex items-center space-x-2 bg-transparent"
-          >
-            <span>FILTERS</span>
-          </Button>
+          {mechanicDayFilter}
         </div>
 
         {/* Scheduler Grid */}
@@ -141,28 +141,36 @@ export function CalendarGrid({
               ref={headerScrollRef}
               className="flex-1 min-w-0 flex overflow-hidden mechanics-scroll-container"
             >
-              {mechanics.map((mechanic) => (
-                <div
-                  key={mechanic.id}
-                  className="min-w-[192px] flex-1 p-4 bg-gray-50 border-r last:border-r-0"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback className="bg-blue-100 text-blue-700 font-medium">
-                        {mechanic.avatar}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium text-gray-900 text-sm">
-                        {mechanic.name}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {mechanic.specialty}
+              {mechanics.map((mechanic) => {
+                const isWorking = workingMechanicIds.has(mechanic.id);
+                return (
+                  <div
+                    key={mechanic.id}
+                    className={cn(
+                      "min-w-[192px] flex-1 border-r p-4 last:border-r-0",
+                      isWorking ? "bg-gray-50" : "bg-amber-50",
+                    )}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback className="bg-blue-100 text-blue-700 font-medium">
+                          {mechanic.avatar}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium text-gray-900 text-sm">
+                          {mechanic.name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {isWorking
+                            ? mechanic.specialty
+                            : "Not working · scheduled jobs"}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -195,27 +203,51 @@ export function CalendarGrid({
               className="flex-1 min-w-0 flex overflow-x-auto mechanics-scroll-container"
               onScroll={handleScroll}
             >
-              {mechanics.map((mechanic, mechanicIndex) => (
-                <div
-                  key={mechanic.id}
-                  className="min-w-[192px] flex-1 border-r last:border-r-0 relative"
-                >
-                  {visibleSlots.map((slot) => (
-                    <DropZone
-                      key={slot}
-                      id={`slot-${mechanicIndex}-${slot}`}
-                      className="h-5 border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors relative"
-                    />
-                  ))}
+              {mechanics.length === 0 ? (
+                <div className="flex min-h-96 flex-1 items-center justify-center bg-white p-8 text-center">
+                  <div>
+                    <Users className="mx-auto mb-3 h-8 w-8 text-gray-400" />
+                    <p className="font-medium text-gray-900">
+                      No mechanics are marked as working
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Use the Mechanics button to update this day.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+              {mechanics.map((mechanic, mechanicIndex) => {
+                const isWorking = workingMechanicIds.has(mechanic.id);
+                return (
+                  <div
+                    key={mechanic.id}
+                    className={cn(
+                      "min-w-[192px] flex-1 border-r last:border-r-0 relative",
+                      !isWorking && "bg-amber-50/30",
+                    )}
+                  >
+                    {visibleSlots.map((slot) => (
+                      <DropZone
+                        key={slot}
+                        id={`slot-${mechanicIndex}-${slot}`}
+                        disabled={!isWorking}
+                        className={cn(
+                          "h-5 border-b border-gray-100 transition-colors relative",
+                          isWorking
+                            ? "bg-white hover:bg-gray-50"
+                            : "bg-amber-50/30",
+                        )}
+                      />
+                    ))}
 
-                  {scheduledJobs
-                    .filter(
+                    {scheduledJobs
+                      .filter(
                       (scheduledJob) =>
                         scheduledJob.mechanic_id === mechanic.id &&
                         scheduledJob.time_slot >= calendarHours.startSlot &&
                         scheduledJob.time_slot < calendarHours.endSlot
                     )
-                    .map((scheduledJob) => (
+                      .map((scheduledJob) => (
                       <ScheduledJobBlock
                         key={scheduledJob.id}
                         scheduledJob={scheduledJob}
@@ -265,9 +297,10 @@ export function CalendarGrid({
                           });
                         }}
                       />
-                    ))}
-                </div>
-              ))}
+                      ))}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
