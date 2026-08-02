@@ -34,7 +34,6 @@ interface JobsPanelProps {
   loadingWorkOrders: boolean;
   currentDate: Date;
   onNavigateDate: (direction: "prev" | "next") => void;
-  onGoToToday: () => void;
   onDateSelect: (date: Date) => void;
   isDraggingScheduledJob: boolean;
   onViewWorkOrder: (
@@ -88,7 +87,6 @@ export function JobsPanel({
   loadingWorkOrders,
   currentDate,
   onNavigateDate,
-  onGoToToday,
   onDateSelect,
   isDraggingScheduledJob,
   onViewWorkOrder,
@@ -170,9 +168,6 @@ export function JobsPanel({
     );
   }, [searchQuery, openCategories, effectiveCategories, filtered]);
 
-  const isToday =
-    currentDate.toDateString() === new Date().toDateString();
-
   const isLoading = loadingWorkOrders && workOrders.length === 0;
 
   return (
@@ -227,16 +222,6 @@ export function JobsPanel({
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
-          {!isToday && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onGoToToday}
-              className="h-8 text-xs hover:bg-blue-50 hover:text-blue-700"
-            >
-              Today
-            </Button>
-          )}
         </div>
 
         {/* Inline date picker */}

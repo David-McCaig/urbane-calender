@@ -15,7 +15,6 @@ interface WorkOrdersSidebarProps {
   loadingWorkOrders: boolean;
   currentDate: Date;
   onNavigateDate: (direction: "prev" | "next") => void;
-  onGoToToday: () => void;
   onDateSelect: (date: Date) => void;
 }
 
@@ -34,13 +33,9 @@ export function WorkOrdersSidebar({
   loadingWorkOrders,
   currentDate,
   onNavigateDate,
-  onGoToToday,
   onDateSelect,
 }: WorkOrdersSidebarProps) {
   const [showInlineDatePicker, setShowInlineDatePicker] = useState(false);
-
-  const isToday =
-    currentDate.toDateString() === new Date().toDateString();
 
   return (
     <div className="w-[30%] flex-shrink-0 bg-white border-l shadow-lg flex flex-col">
@@ -75,16 +70,6 @@ export function WorkOrdersSidebar({
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
-          {!isToday && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onGoToToday}
-              className="h-8 text-xs hover:bg-blue-50 hover:text-blue-700"
-            >
-              Today
-            </Button>
-          )}
         </div>
 
         {/* Inline date picker */}

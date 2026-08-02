@@ -92,10 +92,10 @@ export function DatePicker({ selectedDate, onDateSelect }: DatePickerProps) {
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 place-items-center gap-1">
         {days.map((date, index) => {
           if (!date) {
-            return <div key={index} className="p-2" />;
+            return <div key={index} className="h-8 w-8" />;
           }
 
           return (
