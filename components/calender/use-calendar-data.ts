@@ -242,6 +242,9 @@ export function useCalendarData(activeShop: { id: string } | null): UseCalendarD
       getExistingWorkorderIds(workOrderIdsRef.current)
         .then(setExistingWorkorderIds)
         .catch(console.error);
+      getScheduledJobs(formatLocalDate(currentDateRef.current))
+        .then(setScheduledJobs)
+        .catch(console.error);
     });
 
     const scheduledJobsSubscription = subscribeToScheduledJobs(activeShop.id, (payload) => {
