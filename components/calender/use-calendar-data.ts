@@ -157,10 +157,6 @@ export function useCalendarData(
     setMechanicDayStatusesState(statuses);
   }, []);
 
-  // Keep a ref to allWorkOrders so handleDragEnd can check Lightspeed origin
-  const allWorkOrdersRef = useRef(allWorkOrders);
-  allWorkOrdersRef.current = allWorkOrders;
-
   // Keep a ref to the current workorder IDs so the realtime subscription callback
   // can re-check only the displayed IDs without resubscribing on every data change.
   const workOrderIdsRef = useRef<string[]>([]);
@@ -471,22 +467,15 @@ export function useCalendarData(
       // Optimistically remove from the grid
       setScheduledJobs((prev) => prev.filter((sj) => sj.id !== scheduledJob.id));
       try {
-        await deleteScheduledJob(scheduledJob.id);
-
-        // If this job originated from a Lightspeed work order, delete the local
-        // job record too so it reappears in the sidebar.
-        const isLightspeedOrigin = allWorkOrdersRef.current.some(
-          (wo) => String(wo.workorderID) === scheduledJob.job.workorder_id
-        );
-        if (isLightspeedOrigin) {
-          await deleteJob(scheduledJob.job.id);
-          // Remove workorder_id from existing set so it reappears in the sidebar
-          setExistingWorkorderIds((prev) => {
-            const next = new Set(prev);
-            next.delete(scheduledJob.job.workorder_id);
-            return next;
-          });
-        }
+        // Every local job is the scheduling record for a Lightspeed work order.
+        // Delete it directly and let the FK cascade remove scheduled_jobs. This
+        // is independent of which date the work-orders sidebar is displaying.
+        await deleteJob(scheduledJob.job.id);
+        setExistingWorkorderIds((prev) => {
+          const next = new Set(prev);
+          next.delete(scheduledJob.job.workorder_id);
+          return next;
+        });
       } catch (error) {
         console.error("Error unscheduling job:", error);
         getScheduledJobs(dateString).then(setScheduledJobs).catch(console.error);
@@ -650,22 +639,15 @@ export function useCalendarData(
 
     setScheduledJobs((prev) => prev.filter((sj) => sj.id !== scheduledJobId));
     try {
-      await deleteScheduledJob(scheduledJobId);
-
-      // If this job came from Lightspeed, also delete the local job record
       if (scheduledJob) {
-        const isLightspeedOrigin = allWorkOrdersRef.current.some(
-          (wo) => String(wo.workorderID) === scheduledJob.job.workorder_id
-        );
-        if (isLightspeedOrigin) {
-          await deleteJob(scheduledJob.job.id);
-          // Remove workorder_id from existing set so it reappears in the sidebar
-          setExistingWorkorderIds((prev) => {
-            const next = new Set(prev);
-            next.delete(scheduledJob.job.workorder_id);
-            return next;
-          });
-        }
+        await deleteJob(scheduledJob.job.id);
+        setExistingWorkorderIds((prev) => {
+          const next = new Set(prev);
+          next.delete(scheduledJob.job.workorder_id);
+          return next;
+        });
+      } else {
+        await deleteScheduledJob(scheduledJobId);
       }
     } catch (error) {
       console.error("Error removing scheduled job:", error);

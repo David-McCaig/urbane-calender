@@ -171,4 +171,33 @@ describe("useCalendarData hydration cleanup", () => {
 
     expect(result.current.mechanicDayStatuses).toEqual([nextDayStatus]);
   });
+
+  it("unschedules a work order even when the sidebar is showing another date", async () => {
+    mocks.getWorkOrdersByIds.mockResolvedValue({
+      status: "ok",
+      orders: [],
+      retryAfter: null,
+      retryable: false,
+    });
+    mocks.deleteJob.mockResolvedValue(undefined);
+
+    const activeShop = { id: "shop-1" };
+    const { result } = renderHook(() => useCalendarData(activeShop));
+
+    await waitFor(() => {
+      expect(result.current.scheduledJobs).toHaveLength(1);
+    });
+    expect(result.current.workOrders).toEqual([]);
+
+    await act(async () => {
+      await result.current.handleDragEnd({
+        active: { id: "scheduled-1" },
+        over: { id: "unscheduled-jobs" },
+      } as never);
+    });
+
+    expect(mocks.deleteJob).toHaveBeenCalledWith("job-1");
+    expect(mocks.deleteScheduledJob).not.toHaveBeenCalled();
+    expect(result.current.scheduledJobs).toEqual([]);
+  });
 });
