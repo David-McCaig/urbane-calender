@@ -29,6 +29,7 @@ import {
 import {
   getWorkOrdersByDate,
   getWorkOrdersByIds,
+  getWorkOrderDetails,
   getWorkorderStatuses,
   type WorkOrderHydrationResult,
 } from "@/lib/actions/light-speed";
@@ -36,6 +37,7 @@ import {
   getHydrationRetryDelay,
   shouldRetryHydration,
 } from "@/lib/lightspeed/work-order-hydration";
+import { labourDollarsToDurationHours } from "@/lib/lightspeed/work-order-pricing";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 import {
   DEFAULT_CALENDAR_HOURS,
@@ -523,6 +525,14 @@ export function useCalendarData(
         workorder.hookIn || `Work Order #${workorder.workorderID}`;
 
       try {
+        const details = await getWorkOrderDetails(
+          activeShop!.id,
+          String(workorder.workorderID),
+        );
+        const duration = details.workOrder
+          ? labourDollarsToDurationHours(details.workOrder.totals.labour)
+          : 1;
+
         // Try to create a local job — if it already exists (unique constraint),
         // find and reuse the existing one.
         let jobRecord: Job;
@@ -537,13 +547,16 @@ export function useCalendarData(
             workorder_status_id: workorder.workorderStatusID,
             sale_id: workorder.saleID || "0",
             sale_line_id: workorder.saleLineID || "0",
-            duration: 1,
+            duration,
           });
         } catch (err) {
           // Unique constraint violation — job already exists, find it
           const existing = await getJobByWorkorderId(String(workorder.workorderID));
           if (!existing) throw err;
           jobRecord = existing;
+          if (jobRecord.duration !== duration) {
+            jobRecord = await updateJob(jobRecord.id, { duration });
+          }
         }
 
         // Conflict check
