@@ -692,11 +692,12 @@ export async function getWorkOrderDetails(
       .filter((id) => id && id !== "0");
     let relatedSaleLines: unknown[] = [];
 
-    if (saleLineIds.length > 0) {
+    if (saleLineIds.length > 0 && saleId && saleId !== "0") {
       const idFilter = ["IN", ...new Set(saleLineIds)].join(",");
       const saleLinesUrl =
         `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
-        `/SaleLine.json?saleLineID=${encodeURIComponent(idFilter)}`;
+        `/Sale/${encodeURIComponent(saleId)}/SaleLine.json` +
+        `?saleLineID=${encodeURIComponent(idFilter)}`;
       const saleLinesJson = await fetchLightspeedJson(saleLinesUrl, token);
       relatedSaleLines = relationArray(
         saleLinesJson,

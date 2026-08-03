@@ -54,7 +54,7 @@ function successfulBody(url: string): unknown {
       },
     };
   }
-  if (url.includes("/SaleLine.json")) {
+  if (url.includes("/Sale/sale-1/SaleLine.json")) {
     return {
       SaleLine: {
         saleLineID: "sale-line-1",
@@ -111,5 +111,26 @@ describe("getWorkOrderDetails dependency failures", () => {
       status: "unavailable",
       workOrder: null,
     });
+  });
+
+  it("loads sale lines through their parent sale", async () => {
+    const fetchMock = vi.fn().mockImplementation(
+      (input: string | URL | Request) =>
+        Promise.resolve(response(200, successfulBody(String(input)))),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      getWorkOrderDetails("shop-1", "101"),
+    ).resolves.toMatchObject({ status: "ok" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/Sale/sale-1/SaleLine.json?"),
+      expect.anything(),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/Account/account-1/SaleLine.json"),
+      expect.anything(),
+    );
   });
 });

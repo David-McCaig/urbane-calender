@@ -16,6 +16,7 @@ import type {
 } from "@/lib/lightspeed/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export interface WorkOrderDetailsSelection {
@@ -290,7 +291,13 @@ export function WorkOrderDetailsDialog({
                   <div key={String(label)} className="flex items-center justify-between gap-4 border-b border-slate-300 py-2.5 text-slate-600">
                     <span>{label}</span>
                     <span className="font-medium tabular-nums text-slate-800">
-                      {typeof value === "number" ? `$${formatMoney(value)}` : "—"}
+                      {loading && !totals ? (
+                        <Skeleton className="h-4 w-16" />
+                      ) : typeof value === "number" ? (
+                        `$${formatMoney(value)}`
+                      ) : (
+                        "—"
+                      )}
                     </span>
                   </div>
                 ))}
@@ -298,7 +305,13 @@ export function WorkOrderDetailsDialog({
               <div className="flex items-end justify-between gap-4 pt-3">
                 <span className="text-lg font-bold text-slate-950">Total</span>
                 <span className="text-xl font-bold tabular-nums text-slate-950">
-                  {totals ? `$${formatMoney(totals.total)}` : "—"}
+                  {loading && !totals ? (
+                    <Skeleton className="h-6 w-24" />
+                  ) : totals ? (
+                    `$${formatMoney(totals.total)}`
+                  ) : (
+                    "—"
+                  )}
                 </span>
               </div>
             </aside>
