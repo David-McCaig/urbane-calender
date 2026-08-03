@@ -17,7 +17,9 @@ export function getSiteUrl() {
   if (configuredUrl) return normalizeUrl(configuredUrl);
 
   const vercelUrl =
-    process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+    process.env.VERCEL_ENV === "production"
+      ? process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL
+      : process.env.VERCEL_URL ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
   if (vercelUrl) return normalizeUrl(vercelUrl);
 
   if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
