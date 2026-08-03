@@ -102,10 +102,6 @@ function numberValue(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function stringValue(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
 function booleanValue(value: unknown): boolean {
   return value === true || value === "true" || value === "1" || value === 1;
 }
@@ -139,13 +135,6 @@ function firstNonZeroId(...values: unknown[]): string {
       .map((value) => String(value ?? ""))
       .find((value) => value !== "" && value !== "0") ?? ""
   );
-}
-
-function employeeName(value: unknown): string {
-  const employee = asRecord(value);
-  return [employee.firstName, employee.lastName]
-    .filter((part): part is string => typeof part === "string" && Boolean(part))
-    .join(" ");
 }
 
 function lineKind(line: LightspeedRecord): LightspeedWorkOrderLine["kind"] {
@@ -735,7 +724,6 @@ export async function getWorkOrderDetails(
       workOrderRecord.Discount,
       subtotal,
     );
-    const discounts = workOrderDiscount || lineDiscounts;
     let tax =
       lineTax ||
       numberValue(saleRecord.calcTax) ||
