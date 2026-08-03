@@ -123,6 +123,32 @@ describe("useCalendarData hydration cleanup", () => {
     expect(mocks.getWorkOrdersByIds).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the list estimate for optimistic work-order duration", async () => {
+    mocks.getScheduledJobs.mockResolvedValue([]);
+    mocks.getWorkOrdersByIds.mockResolvedValue({
+      status: "ok",
+      orders: [],
+      retryAfter: null,
+      retryable: false,
+    });
+    mocks.getWorkOrdersByDate.mockResolvedValue([
+      {
+        workorderID: "estimated-123",
+        estimatedDuration: 1.75,
+      },
+    ]);
+
+    const activeShop = { id: "shop-1" };
+    const { result } = renderHook(() => useCalendarData(activeShop));
+
+    await waitFor(() => {
+      expect(result.current.workOrderDurations).toEqual({
+        "estimated-123": 1.75,
+      });
+    });
+    expect(result.current.workOrders).toHaveLength(1);
+  });
+
   it("discards a realtime status response after navigating to another day", async () => {
     mocks.getScheduledJobs.mockResolvedValue([]);
     mocks.getWorkOrdersByIds.mockResolvedValue({

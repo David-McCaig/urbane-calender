@@ -24,6 +24,25 @@ export function labourDollarsToDurationHours(
   );
 }
 
+export function labourLinesToDurationHours(
+  lines: unknown[],
+  hourlyRate = DEFAULT_SHOP_LABOUR_RATE,
+): number {
+  const labourDollars = lines.reduce<number>(
+    (sum, line, index) =>
+      sum +
+      normalizeWorkOrderPricingLine(
+        line,
+        index,
+        "labour",
+        hourlyRate,
+      ).subtotal,
+    0,
+  );
+
+  return labourDollarsToDurationHours(labourDollars, hourlyRate);
+}
+
 type LightspeedRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): LightspeedRecord {

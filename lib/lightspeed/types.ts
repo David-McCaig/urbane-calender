@@ -66,6 +66,9 @@ export interface LightspeedWorkOrder {
   Serialized?: LightspeedSerialized;
   WorkorderStatus?: LightspeedWorkOrderStatus;
   Employee?: LightspeedEmployee;
+  WorkorderLines?: unknown;
+  /** Calendar estimate derived from embedded Lightspeed labour lines. */
+  estimatedDuration?: number;
 }
 
 export type WorkOrderLineKind = "labour" | "part" | "fee";

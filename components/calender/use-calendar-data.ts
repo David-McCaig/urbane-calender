@@ -37,7 +37,6 @@ import {
 import {
   getWorkOrdersByDate,
   getWorkOrdersByIds,
-  getWorkOrderDetails,
   getWorkorderStatuses,
   type WorkOrderHydrationResult,
 } from "@/lib/actions/light-speed";
@@ -45,7 +44,6 @@ import {
   getHydrationRetryDelay,
   shouldRetryHydration,
 } from "@/lib/lightspeed/work-order-hydration";
-import { labourDollarsToDurationHours } from "@/lib/lightspeed/work-order-pricing";
 import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/types";
 import {
   DEFAULT_CALENDAR_HOURS,
@@ -289,28 +287,26 @@ export function useCalendarData(
     setLoadingWorkOrders(true);
     getWorkOrdersByDate(activeShop.id, workOrdersDateStr)
       .then(async (orders) => {
-        const durationEntries = await Promise.all(
-          orders.map(async (workOrder) => {
-            const workorderId = String(workOrder.workorderID);
-            const details = await getWorkOrderDetails(activeShop.id, workorderId);
-            return [
-              workorderId,
-              details.workOrder
-                ? labourDollarsToDurationHours(
-                    details.workOrder.totals.labour,
-                    details.workOrder.shopLabourRate,
-                  )
-                : 1,
-            ] as const;
-          }),
-        );
         if (cancelled) return;
 
-        setWorkOrderDurations(Object.fromEntries(durationEntries));
+        // Render the lightweight list response immediately. Fetching complete
+        // details for every row exhausts Lightspeed's request bucket because a
+        // single detail lookup fans out to several dependency requests.
+        setWorkOrderDurations(
+          Object.fromEntries(
+            orders.flatMap((order) =>
+              typeof order.estimatedDuration === "number"
+                ? [[String(order.workorderID), order.estimatedDuration]]
+                : [],
+            ),
+          ),
+        );
         setAllWorkOrders(orders);
+        setWorkOrders(orders);
         const displayedIds = orders.map((wo) => String(wo.workorderID));
         workOrderIdsRef.current = displayedIds;
         const existingIds = await getExistingWorkorderIds(displayedIds);
+        if (cancelled) return;
         setExistingWorkorderIds(existingIds);
         setWorkOrders(
           orders.filter((wo) => !existingIds.has(String(wo.workorderID)))
@@ -560,7 +556,7 @@ export function useCalendarData(
         workorder.hookIn || `Work Order #${workorder.workorderID}`;
 
       const workorderId = String(workorder.workorderID);
-      const duration = workOrderDurations[workorderId] ?? 1;
+      const initialDuration = workOrderDurations[workorderId] ?? 1;
       const optimisticId = `optimistic-${workorderId}-${Date.now()}`;
       const timestamp = new Date().toISOString();
       const optimisticJobRecord: Job = {
@@ -574,7 +570,7 @@ export function useCalendarData(
         workorder_status_id: workorder.workorderStatusID,
         sale_id: workorder.saleID || "0",
         sale_line_id: workorder.saleLineID || "0",
-        duration,
+        duration: initialDuration,
         created_at: timestamp,
         updated_at: timestamp,
       };
@@ -604,6 +600,8 @@ export function useCalendarData(
           setExistingWorkorderIds((current) => new Set(current).add(workorderId));
 
           try {
+            const duration = initialDuration;
+
             // Try to create a local job — if it already exists (unique constraint),
             // find and reuse the existing one.
             let jobRecord: Job;
