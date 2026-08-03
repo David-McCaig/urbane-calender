@@ -11,6 +11,8 @@ import {
 } from "@/lib/lightspeed/work-order-date";
 import {
   calculateWorkOrderTotals,
+  DEFAULT_SHOP_LABOUR_RATE,
+  labourLinesToDurationHours,
   normalizeWorkOrderPricingLine,
 } from "@/lib/lightspeed/work-order-pricing";
 import type {
@@ -25,6 +27,7 @@ import type {
 
 const WORK_ORDER_HYDRATION_DEDUPE_MS = 10_000;
 const LIGHTSPEED_HYDRATION_TIMEOUT_MS = 8_000;
+const SHOP_SERVICE_RATE_CACHE_MS = 5 * 60_000;
 
 type LightspeedRecord = Record<string, unknown>;
 
@@ -223,6 +226,11 @@ const workOrderHydrationRequests = new Map<
   WorkOrderHydrationCacheEntry
 >();
 
+const shopServiceRateRequests = new Map<
+  string,
+  { expiresAt: number; promise: Promise<number> }
+>();
+
 function logLightspeedRateLimitHeaders(response: Response): void {
   const bucketLevel = response.headers.get("x-ls-api-bucket-level");
   const dripRate = response.headers.get("x-ls-api-drip-rate");
@@ -244,6 +252,39 @@ function logLightspeedRateLimitHeaders(response: Response): void {
       requestCost,
     });
   }
+}
+
+async function getShopServiceRate(
+  accountId: string,
+  lightspeedShopId: string,
+  token: string,
+): Promise<number> {
+  if (!lightspeedShopId) return DEFAULT_SHOP_LABOUR_RATE;
+
+  const cacheKey = `${accountId}:${lightspeedShopId}`;
+  const now = Date.now();
+  const cached = shopServiceRateRequests.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = (async () => {
+    const url =
+      `https://api.lightspeedapp.com/API/V3/Account/${accountId}` +
+      `/Shop/${encodeURIComponent(lightspeedShopId)}.json`;
+    const shopJson = await fetchLightspeedJson(url, token);
+    const serviceRate = numberValue(
+      responseRecord(shopJson, "Shop").serviceRate,
+    );
+    return serviceRate || DEFAULT_SHOP_LABOUR_RATE;
+  })().catch((error) => {
+    console.warn("[getShopServiceRate] Using default labour rate", error);
+    return DEFAULT_SHOP_LABOUR_RATE;
+  });
+
+  shopServiceRateRequests.set(cacheKey, {
+    expiresAt: now + SHOP_SERVICE_RATE_CACHE_MS,
+    promise,
+  });
+  return promise;
 }
 
 /**
@@ -430,7 +471,7 @@ export async function getWorkOrdersByDate(
     // Lightspeed between operator: %3E%3C = ><  ,  %2C = ,
     const queryString =
       `etaOut=%3E%3C%2C${encodeURIComponent(startISO)}%2C${encodeURIComponent(endISO)}` +
-      `&load_relations=${encodeURIComponent('["Customer","Serialized"]')}`;
+      `&load_relations=${encodeURIComponent('["Customer","Serialized","WorkorderLines"]')}`;
 
     const url = `https://api.lightspeedapp.com/API/V3/Account/${accountId}/Workorder.json?${queryString}`;
 
@@ -439,7 +480,11 @@ export async function getWorkOrdersByDate(
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
       },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(LIGHTSPEED_HYDRATION_TIMEOUT_MS),
     });
+
+    logLightspeedRateLimitHeaders(response);
 
     if (!response.ok) {
       console.error(
@@ -461,9 +506,44 @@ export async function getWorkOrdersByDate(
       allWorkOrders = json.Workorder;
     }
 
-    return allWorkOrders.filter((workOrder) =>
+    const workOrdersForDate = allWorkOrders.filter((workOrder) =>
       isWorkOrderOnDate(workOrder.etaOut, date),
     );
+    const serviceRates = new Map<string, number>();
+    await Promise.all(
+      [...new Set(workOrdersForDate.map((order) => String(order.shopID || "")))]
+        .filter(Boolean)
+        .map(async (lightspeedShopId) => {
+          serviceRates.set(
+            lightspeedShopId,
+            await getShopServiceRate(accountId, lightspeedShopId, token),
+          );
+        }),
+    );
+
+    return workOrdersForDate.map((workOrder) => {
+      const workOrderRecord = asRecord(workOrder);
+      const hasEmbeddedLabour =
+        "WorkorderLines" in workOrderRecord ||
+        "WorkorderLine" in workOrderRecord;
+      if (!hasEmbeddedLabour) return workOrder;
+
+      const labourLines = relationArray(
+        workOrderRecord,
+        "WorkorderLine",
+        "WorkorderLines",
+      );
+      const serviceRate =
+        serviceRates.get(String(workOrder.shopID || "")) ||
+        DEFAULT_SHOP_LABOUR_RATE;
+      return {
+        ...workOrder,
+        estimatedDuration: labourLinesToDurationHours(
+          labourLines,
+          serviceRate,
+        ),
+      };
+    });
   } catch (error) {
     console.error('[getWorkOrdersByDate] Unexpected error:', error);
     return [];
@@ -783,6 +863,7 @@ export async function getWorkOrderDetails(
     const details: LightspeedWorkOrderDetails = {
       ...workOrder,
       lines,
+      shopLabourRate: serviceRate || DEFAULT_SHOP_LABOUR_RATE,
       totals: calculateWorkOrderTotals(lines, {
         workOrderDiscount: workOrderRecord.Discount,
         calculatedTax: tax,

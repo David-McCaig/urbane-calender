@@ -6,10 +6,12 @@ import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/t
 
 export function DraggableWorkOrder({
   workorder,
+  duration = 1,
   statusMap,
   onViewDetails,
 }: {
   workorder: LightspeedWorkOrder;
+  duration?: number;
   statusMap: WorkOrderStatusMap;
   onViewDetails?: (workorder: LightspeedWorkOrder, statusName: string) => void;
 }) {
@@ -49,7 +51,7 @@ export function DraggableWorkOrder({
           customerName,
           customerItem,
           status: statusName,
-          duration: 1,
+          duration,
         }}
         onViewDetails={
           onViewDetails

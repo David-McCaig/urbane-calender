@@ -1,6 +1,7 @@
 import {
   calculateWorkOrderTotals,
   labourDollarsToDurationHours,
+  labourLinesToDurationHours,
   normalizeWorkOrderPricingLine,
 } from "@/lib/lightspeed/work-order-pricing";
 import { describe, expect, it } from "vitest";
@@ -14,6 +15,29 @@ describe("labourDollarsToDurationHours", () => {
 
   it("uses a minimum 15-minute calendar allocation", () => {
     expect(labourDollarsToDurationHours(0)).toBe(0.25);
+  });
+});
+
+describe("labourLinesToDurationHours", () => {
+  it("estimates duration from the combined embedded labour dollars", () => {
+    expect(
+      labourLinesToDurationHours(
+        [
+          { unitPriceOverride: "120", unitQuantity: "1" },
+          { calcSubtotal: "60", unitQuantity: "1" },
+        ],
+        120,
+      ),
+    ).toBe(1.5);
+  });
+
+  it("uses timed labour when a line has no explicit price", () => {
+    expect(
+      labourLinesToDurationHours(
+        [{ hours: "0", minutes: "45", unitPrice: "0" }],
+        160,
+      ),
+    ).toBe(0.75);
   });
 });
 
