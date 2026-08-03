@@ -90,6 +90,7 @@ export interface LightspeedWorkOrderLine {
 
 export interface LightspeedWorkOrderDetails extends LightspeedWorkOrder {
   lines: LightspeedWorkOrderLine[];
+  shopLabourRate: number;
   totals: {
     labour: number;
     parts: number;

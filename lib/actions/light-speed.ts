@@ -11,6 +11,7 @@ import {
 } from "@/lib/lightspeed/work-order-date";
 import {
   calculateWorkOrderTotals,
+  DEFAULT_SHOP_LABOUR_RATE,
   normalizeWorkOrderPricingLine,
 } from "@/lib/lightspeed/work-order-pricing";
 import type {
@@ -783,6 +784,7 @@ export async function getWorkOrderDetails(
     const details: LightspeedWorkOrderDetails = {
       ...workOrder,
       lines,
+      shopLabourRate: serviceRate || DEFAULT_SHOP_LABOUR_RATE,
       totals: calculateWorkOrderTotals(lines, {
         workOrderDiscount: workOrderRecord.Discount,
         calculatedTax: tax,

@@ -30,6 +30,7 @@ import type { LightspeedWorkOrder, WorkOrderStatusMap } from "@/lib/lightspeed/t
 
 interface JobsPanelProps {
   workOrders: LightspeedWorkOrder[];
+  workOrderDurations: Record<string, number>;
   workOrderStatusMap: WorkOrderStatusMap;
   loadingWorkOrders: boolean;
   currentDate: Date;
@@ -83,6 +84,7 @@ function sortCategories(categories: string[]): string[] {
 
 export function JobsPanel({
   workOrders,
+  workOrderDurations,
   workOrderStatusMap,
   loadingWorkOrders,
   currentDate,
@@ -321,6 +323,7 @@ export function JobsPanel({
                           <DraggableWorkOrder
                             key={wo.workorderID}
                             workorder={wo}
+                            duration={workOrderDurations[String(wo.workorderID)] ?? 1}
                             statusMap={workOrderStatusMap}
                             onViewDetails={onViewWorkOrder}
                           />

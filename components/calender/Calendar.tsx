@@ -30,6 +30,7 @@ export default function Calendar() {
     scheduledJobs,
     scheduledWorkOrders,
     workOrders,
+    workOrderDurations,
     workOrderStatusMap,
     loadingGrid,
     loadingWorkOrders,
@@ -133,6 +134,7 @@ export default function Calendar() {
 
         <JobsPanel
           workOrders={workOrders}
+          workOrderDurations={workOrderDurations}
           workOrderStatusMap={workOrderStatusMap}
           loadingWorkOrders={loadingWorkOrders}
           currentDate={workOrdersDate}

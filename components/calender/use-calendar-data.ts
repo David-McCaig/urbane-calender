@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+} from "react";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import {
   getExistingWorkorderIds,
@@ -68,6 +76,7 @@ interface UseCalendarDataReturn {
   scheduledJobs: ScheduledJob[];
   scheduledWorkOrders: Record<string, LightspeedWorkOrder>;
   workOrders: LightspeedWorkOrder[];
+  workOrderDurations: Record<string, number>;
   workOrderStatusMap: WorkOrderStatusMap;
   loadingGrid: boolean;
   loadingWorkOrders: boolean;
@@ -97,6 +106,13 @@ export function useCalendarData(
 ): UseCalendarDataReturn {
   const [existingWorkorderIds, setExistingWorkorderIds] = useState<Set<string>>(new Set());
   const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
+  const [visibleScheduledJobs, addOptimisticScheduledJob] = useOptimistic(
+    scheduledJobs,
+    (currentJobs, optimisticJob: ScheduledJob) => [
+      ...currentJobs.filter((job) => job.id !== optimisticJob.id),
+      optimisticJob,
+    ],
+  );
   const [scheduledWorkOrders, setScheduledWorkOrders] = useState<
     Record<string, LightspeedWorkOrder>
   >({});
@@ -106,6 +122,9 @@ export function useCalendarData(
   >([]);
   const [allWorkOrders, setAllWorkOrders] = useState<LightspeedWorkOrder[]>([]);
   const [workOrders, setWorkOrders] = useState<LightspeedWorkOrder[]>([]);
+  const [workOrderDurations, setWorkOrderDurations] = useState<
+    Record<string, number>
+  >({});
   const [loadingGrid, setLoadingGrid] = useState(true);
   const [loadingWorkOrders, setLoadingWorkOrders] = useState(true);
   const [workOrderStatusMap, setWorkOrderStatusMap] = useState<WorkOrderStatusMap>({});
@@ -122,15 +141,15 @@ export function useCalendarData(
     [workingMechanics],
   );
   const mechanics = useMemo(
-    () => getVisibleMechanics(allMechanics, workingMechanics, scheduledJobs),
-    [allMechanics, workingMechanics, scheduledJobs],
+    () => getVisibleMechanics(allMechanics, workingMechanics, visibleScheduledJobs),
+    [allMechanics, workingMechanics, visibleScheduledJobs],
   );
   const scheduledWorkorderIdsKey = useMemo(
     () =>
-      [...new Set(scheduledJobs.map((item) => item.job.workorder_id))]
+      [...new Set(visibleScheduledJobs.map((item) => item.job.workorder_id))]
         .sort()
         .join(","),
-    [scheduledJobs],
+    [visibleScheduledJobs],
   );
 
   // Keep a ref to currentDate so the realtime callbacks always read the latest date
@@ -265,10 +284,29 @@ export function useCalendarData(
     if (!activeShop) return;
 
     const workOrdersDateStr = formatLocalDate(workOrdersDate);
+    let cancelled = false;
 
     setLoadingWorkOrders(true);
     getWorkOrdersByDate(activeShop.id, workOrdersDateStr)
       .then(async (orders) => {
+        const durationEntries = await Promise.all(
+          orders.map(async (workOrder) => {
+            const workorderId = String(workOrder.workorderID);
+            const details = await getWorkOrderDetails(activeShop.id, workorderId);
+            return [
+              workorderId,
+              details.workOrder
+                ? labourDollarsToDurationHours(
+                    details.workOrder.totals.labour,
+                    details.workOrder.shopLabourRate,
+                  )
+                : 1,
+            ] as const;
+          }),
+        );
+        if (cancelled) return;
+
+        setWorkOrderDurations(Object.fromEntries(durationEntries));
         setAllWorkOrders(orders);
         const displayedIds = orders.map((wo) => String(wo.workorderID));
         workOrderIdsRef.current = displayedIds;
@@ -279,11 +317,19 @@ export function useCalendarData(
         );
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error("Error fetching work orders:", err);
         setAllWorkOrders([]);
         setWorkOrders([]);
+        setWorkOrderDurations({});
       })
-      .finally(() => setLoadingWorkOrders(false));
+      .finally(() => {
+        if (!cancelled) setLoadingWorkOrders(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [workOrdersDate, activeShop]);
 
   // Keep workOrders in sync when existingWorkorderIds or allWorkOrders change
@@ -426,7 +472,7 @@ export function useCalendarData(
 
         setActiveDragOverlay({
           title: hookIn,
-          subtitle: `${customerName} • ${customerItem} • 1h`,
+          subtitle: `${customerName} • ${customerItem} • ${workOrderDurations[String(workorder.workorderID)] ?? 1}h`,
         });
       }
       return;
@@ -513,76 +559,124 @@ export function useCalendarData(
       const hookIn =
         workorder.hookIn || `Work Order #${workorder.workorderID}`;
 
-      try {
-        const details = await getWorkOrderDetails(
-          activeShop!.id,
-          String(workorder.workorderID),
-        );
-        const duration = details.workOrder
-          ? labourDollarsToDurationHours(details.workOrder.totals.labour)
-          : 1;
+      const workorderId = String(workorder.workorderID);
+      const duration = workOrderDurations[workorderId] ?? 1;
+      const optimisticId = `optimistic-${workorderId}-${Date.now()}`;
+      const timestamp = new Date().toISOString();
+      const optimisticJobRecord: Job = {
+        id: `optimistic-job-${workorderId}`,
+        shop_id: activeShop!.id,
+        workorder_id: workorderId,
+        time_in: workorder.timeIn,
+        eta_out: workorder.etaOut,
+        customer_id: customerName,
+        hook_in: hookIn,
+        workorder_status_id: workorder.workorderStatusID,
+        sale_id: workorder.saleID || "0",
+        sale_line_id: workorder.saleLineID || "0",
+        duration,
+        created_at: timestamp,
+        updated_at: timestamp,
+      };
+      const optimisticScheduledJob: ScheduledJob = {
+        id: optimisticId,
+        job_id: optimisticJobRecord.id,
+        shop_id: activeShop!.id,
+        mechanic_id: targetMechanic.id,
+        time_slot: timeSlot,
+        date: dateString,
+        created_at: timestamp,
+        updated_at: timestamp,
+        job: optimisticJobRecord,
+        mechanic: targetMechanic,
+      };
 
-        // Try to create a local job — if it already exists (unique constraint),
-        // find and reuse the existing one.
-        let jobRecord: Job;
-        try {
-          jobRecord = await createJob({
-            shop_id: activeShop!.id,
-            workorder_id: String(workorder.workorderID),
-            time_in: workorder.timeIn,
-            eta_out: workorder.etaOut,
-            customer_id: customerName,
-            hook_in: hookIn,
-            workorder_status_id: workorder.workorderStatusID,
-            sale_id: workorder.saleID || "0",
-            sale_line_id: workorder.saleLineID || "0",
-            duration,
-          });
-        } catch (err) {
-          // Unique constraint violation — job already exists, find it
-          const existing = await getJobByWorkorderId(String(workorder.workorderID));
-          if (!existing) throw err;
-          jobRecord = existing;
-          if (jobRecord.duration !== duration) {
-            jobRecord = await updateJob(jobRecord.id, { duration });
+      // Keep React's optimistic layer active for the full async mutation. The
+      // temporary row is replaced by the server-returned row before the action
+      // completes, so the card never disappears while Supabase catches up.
+      await new Promise<void>((resolve) => {
+        startTransition(async () => {
+          addOptimisticScheduledJob(optimisticScheduledJob);
+          setScheduledWorkOrders((current) => ({
+            ...current,
+            [workorderId]: workorder,
+          }));
+          setExistingWorkorderIds((current) => new Set(current).add(workorderId));
+
+          try {
+            // Try to create a local job — if it already exists (unique constraint),
+            // find and reuse the existing one.
+            let jobRecord: Job;
+            try {
+              jobRecord = await createJob({
+                shop_id: activeShop!.id,
+                workorder_id: workorderId,
+                time_in: workorder.timeIn,
+                eta_out: workorder.etaOut,
+                customer_id: customerName,
+                hook_in: hookIn,
+                workorder_status_id: workorder.workorderStatusID,
+                sale_id: workorder.saleID || "0",
+                sale_line_id: workorder.saleLineID || "0",
+                duration,
+              });
+            } catch (err) {
+              // Unique constraint violation — job already exists, find it
+              const existing = await getJobByWorkorderId(workorderId);
+              if (!existing) throw err;
+              jobRecord = existing;
+              if (jobRecord.duration !== duration) {
+                jobRecord = await updateJob(jobRecord.id, { duration });
+              }
+            }
+
+            // Conflict check
+            const conflicts = getSchedulingConflicts(
+              jobRecord,
+              mechanicIndex,
+              timeSlot,
+              scheduledJobs,
+              mechanicsList,
+              calendarHours,
+            );
+            if (conflicts.length > 0) {
+              setExistingWorkorderIds((current) => {
+                const next = new Set(current);
+                next.delete(workorderId);
+                return next;
+              });
+              alert(`Cannot schedule job: ${conflicts.join(", ")}`);
+              return;
+            }
+
+            const createdScheduledJob = await createScheduledJob({
+              job_id: jobRecord.id,
+              shop_id: activeShop!.id,
+              mechanic_id: targetMechanic.id,
+              time_slot: timeSlot,
+              date: dateString,
+            });
+
+            setScheduledJobs((current) => [
+              ...current.filter(
+                (item) => item.job.workorder_id !== workorderId,
+              ),
+              createdScheduledJob,
+            ]);
+          } catch (error) {
+            console.error("Error scheduling Lightspeed work order:", error);
+            setExistingWorkorderIds((current) => {
+              const next = new Set(current);
+              next.delete(workorderId);
+              return next;
+            });
+            getScheduledJobs(dateString).then(setScheduledJobs).catch(console.error);
+            alert("Failed to schedule job. Please try again.");
+          } finally {
+            resolve();
           }
-        }
-
-        // Conflict check
-        const conflicts = getSchedulingConflicts(
-          jobRecord,
-          mechanicIndex,
-          timeSlot,
-          scheduledJobs,
-          mechanicsList,
-          calendarHours,
-        );
-        if (conflicts.length > 0) {
-          alert(`Cannot schedule job: ${conflicts.join(", ")}`);
-          return;
-        }
-
-        // Create scheduled job
-        await createScheduledJob({
-          job_id: jobRecord.id,
-          shop_id: activeShop!.id,
-          mechanic_id: mechanicsList[mechanicIndex].id,
-          time_slot: timeSlot,
-          date: dateString,
         });
-
-        // Re-fetch scheduled jobs to reconcile — realtime subscription will also fire.
-        // Add workorder_id to existing set locally so the sidebar filters it out
-        // without needing a full jobs re-fetch.
-        getScheduledJobs(dateString).then(setScheduledJobs).catch(console.error);
-        setExistingWorkorderIds((prev) =>
-          new Set(prev).add(String(workorder.workorderID))
-        );
-      } catch (error) {
-        console.error("Error scheduling Lightspeed work order:", error);
-        getScheduledJobs(dateString).then(setScheduledJobs).catch(console.error);
-        alert("Failed to schedule job. Please try again.");
-      }
+      });
       return;
     }
 
@@ -706,9 +800,10 @@ export function useCalendarData(
     workingMechanicIds,
     allMechanics,
     mechanicDayStatuses,
-    scheduledJobs,
+    scheduledJobs: visibleScheduledJobs,
     scheduledWorkOrders,
     workOrders,
+    workOrderDurations,
     workOrderStatusMap,
     loadingGrid,
     loadingWorkOrders,
