@@ -3,6 +3,27 @@ import type {
   LightspeedWorkOrderLine,
 } from "@/lib/lightspeed/types";
 
+export const DEFAULT_SHOP_LABOUR_RATE = 120;
+const QUARTER_HOUR = 0.25;
+
+export function labourDollarsToDurationHours(
+  labourDollars: number,
+  hourlyRate = DEFAULT_SHOP_LABOUR_RATE,
+): number {
+  if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) {
+    throw new Error("Shop labour rate must be greater than zero");
+  }
+
+  const safeLabourDollars = Number.isFinite(labourDollars)
+    ? Math.max(0, labourDollars)
+    : 0;
+
+  return Math.max(
+    QUARTER_HOUR,
+    Math.ceil(safeLabourDollars / hourlyRate / QUARTER_HOUR) * QUARTER_HOUR,
+  );
+}
+
 type LightspeedRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): LightspeedRecord {

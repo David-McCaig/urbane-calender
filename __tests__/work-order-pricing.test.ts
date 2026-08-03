@@ -1,8 +1,21 @@
 import {
   calculateWorkOrderTotals,
+  labourDollarsToDurationHours,
   normalizeWorkOrderPricingLine,
 } from "@/lib/lightspeed/work-order-pricing";
 import { describe, expect, it } from "vitest";
+
+describe("labourDollarsToDurationHours", () => {
+  it("converts labour dollars at $120/hour and rounds up to 15 minutes", () => {
+    expect(labourDollarsToDurationHours(120)).toBe(1);
+    expect(labourDollarsToDurationHours(121)).toBe(1.25);
+    expect(labourDollarsToDurationHours(60)).toBe(0.5);
+  });
+
+  it("uses a minimum 15-minute calendar allocation", () => {
+    expect(labourDollarsToDurationHours(0)).toBe(0.25);
+  });
+});
 
 describe("normalizeWorkOrderPricingLine", () => {
   it("prices timed labour using the shop service rate", () => {
