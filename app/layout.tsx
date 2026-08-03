@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "http://localhost:3000";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(defaultUrl),
+  metadataBase: new URL(getSiteUrl()),
   title: "Urbane Calendar — Service scheduling for bike shops",
   description:
     "Turn Lightspeed Retail work orders into a clear service schedule for your entire workshop.",

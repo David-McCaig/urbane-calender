@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { randomBytes } from 'crypto';
 import { Resend } from 'resend';
+import { getSiteUrl } from '@/lib/site-url';
 import type { MembershipRole, UserShopMembership, Invitation, Shop } from '@/lib/types/membership';
 
 // --- Helpers ---
@@ -339,8 +340,7 @@ export async function createInvitation(
   }
 
   // Build the absolute invite URL
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  const inviteUrl = `${baseUrl}/auth/accept-invitation?token=${token}`;
+  const inviteUrl = `${getSiteUrl()}/auth/accept-invitation?token=${token}`;
 
   // Send the invitation email via Resend
   let emailSent = false;
